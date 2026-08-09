@@ -65,6 +65,7 @@ main{ max-width:1200px; margin:0 auto; padding:22px 20px 60px; }
 .card{ background:var(--sand); border-radius:var(--radius); padding:20px; box-shadow:var(--shadow); margin-bottom:18px; }
 .card h2{ font-family:var(--font-display); text-transform:uppercase; letter-spacing:0.5px; font-size:15px; margin:0 0 4px; color:var(--navy); }
 .card .sub{ color:var(--muted); font-size:13px; margin:0 0 14px; }
+.row{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
 .grid{ display:grid; gap:16px; }
 .grid.cols-2{ grid-template-columns:1fr 1fr; }
 .grid.cols-3{ grid-template-columns:repeat(3,1fr); }
@@ -115,6 +116,10 @@ main{ max-width:1200px; margin:0 auto; padding:22px 20px 60px; }
 .team-card li .p{ font-family:var(--font-mono); font-size:12px; color:var(--muted); white-space:nowrap; }
 .team-card .empty-list{ color:var(--muted); font-size:13px; padding:6px 0; }
 
+.thumb{ width:26px; height:26px; object-fit:cover; border-radius:6px; border:1px solid var(--line); vertical-align:middle; margin-right:7px; background:#fff; }
+.thumb-empty{ display:inline-flex; align-items:center; justify-content:center; width:26px; height:26px; border-radius:6px; border:1px dashed var(--line); color:var(--muted); font-size:11px; vertical-align:middle; margin-right:7px; background:#fff; }
+.sb-photo{ width:84px; height:84px; object-fit:cover; border-radius:14px; border:3px solid rgba(255,255,255,0.25); background:var(--navy-2); }
+
 .footer-note{ text-align:center; color:rgba(245,238,226,0.45); font-size:11.5px; padding:10px 0 30px; font-family:var(--font-mono); }
 .footer-note a{ color:var(--orange-2); }
 </style>
@@ -140,9 +145,12 @@ main{ max-width:1200px; margin:0 auto; padding:22px 20px 60px; }
   <div class="card scoreboard" id="scoreboardCard">
     <div class="sb-idle" id="sbIdle">Waiting for the next player…</div>
     <div class="sb-top hidden" id="sbTop">
-      <div>
-        <p class="sb-player-name" id="sbName">—</p>
-        <p class="sb-player-meta" id="sbMeta">—</p>
+      <div class="row" style="gap:16px; align-items:center; position:relative; z-index:1;">
+        <img class="sb-photo" id="sbPhoto" src="" alt="" style="display:none;">
+        <div>
+          <p class="sb-player-name" id="sbName">—</p>
+          <p class="sb-player-meta" id="sbMeta">—</p>
+        </div>
       </div>
       <div class="sb-timer">
         <svg width="78" height="78" viewBox="0 0 78 78">
@@ -194,6 +202,11 @@ function money(n){
   return cur + v.toLocaleString('en-IN');
 }
 function findCaptain(id){ return state.captains.find(c=>c.id===id); }
+function thumbHTML(p){
+  return p && p.photo
+    ? `<img class="thumb" src="/uploads/${esc(p.photo)}" alt="" loading="lazy">`
+    : `<span class="thumb-empty">👤</span>`;
+}
 
 async function fetchState(){
   try{
@@ -254,6 +267,11 @@ function renderScoreboard(){
   document.getElementById('sbMeta').textContent = [player.team, player.position].filter(Boolean).join(' · ') || 'No team / position listed';
   document.getElementById('sbBidAmount').textContent = a.current_bidder_id ? money(a.current_bid) : 'Starting ' + money(player.base_price);
   document.getElementById('sbBidder').textContent = a.current_bidder_id ? (findCaptain(a.current_bidder_id)?.name || '—') : 'No bids yet';
+  const sbPhoto = document.getElementById('sbPhoto');
+  if(sbPhoto){
+    if(player.photo){ sbPhoto.src = '/uploads/' + player.photo; sbPhoto.style.display = 'inline-block'; }
+    else { sbPhoto.style.display = 'none'; }
+  }
   renderCountdown();
 }
 
@@ -291,7 +309,7 @@ function renderTeams(finalMode){
     const members = state.players.filter(p=>p.sold_to===c.id);
     const spent = c.budget - c.remaining;
     const rows = members.length
-      ? members.map(p=>`<li><span>${esc(p.name)}</span><span class="p">${p.sold_price ? money(p.sold_price) : ''}</span></li>`).join('')
+      ? members.map(p=>`<li>${thumbHTML(p)}<span>${esc(p.name)}</span><span class="p">${p.sold_price ? money(p.sold_price) : ''}</span></li>`).join('')
       : '<div class="empty-list">No players yet</div>';
     return `
       <div class="team-card ${finalMode?'final':''}">

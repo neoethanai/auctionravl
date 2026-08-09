@@ -131,6 +131,16 @@ tr:hover td{ background:rgba(239,108,31,0.05); }
 .badge-live{ background:var(--gold); color:#3a2a00; animation:pulse 1.4s infinite; }
 @keyframes pulse{ 0%,100%{opacity:1;} 50%{opacity:0.55;} }
 
+.player-thumb{ width:42px; height:42px; object-fit:cover; border-radius:8px; border:1.5px solid var(--line); background:#fff; display:inline-block; vertical-align:middle; }
+.player-thumb.small{ width:30px; height:30px; }
+.photo-empty{ display:inline-flex; align-items:center; justify-content:center; width:42px; height:42px; border-radius:8px; border:1.5px dashed var(--line); color:var(--muted); font-size:16px; background:#fff; vertical-align:middle; }
+.photo-empty.small{ width:30px; height:30px; font-size:12px; }
+.sb-photo{ width:74px; height:74px; object-fit:cover; border-radius:14px; border:3px solid rgba(255,255,255,0.25); background:var(--navy-2); }
+.photo-badge{ position:absolute; bottom:-4px; right:-4px; background:var(--navy); color:var(--sand); border-radius:50%; width:20px; height:20px; display:flex; align-items:center; justify-content:center; font-size:11px; cursor:pointer; border:1.5px solid var(--sand); }
+.thumb-wrap{ position:relative; display:inline-block; line-height:0; }
+.thumb-wrap .photo-empty{ display:inline-flex; }
+.thumb-wrap .photo-badge{ position:absolute; bottom:-4px; right:-4px; }
+
 .empty{ text-align:center; padding:34px 10px; color:var(--muted); font-size:14px; }
 .empty strong{ display:block; color:var(--navy); font-size:15px; margin-bottom:4px; }
 
@@ -304,7 +314,7 @@ details summary{ cursor:pointer; font-weight:700; color:var(--navy); font-family
       </div>
       <div style="overflow-x:auto;">
         <table id="playerTable">
-          <thead><tr><th>Name</th><th>Team</th><th>Position</th><th>Base</th><th>Status</th><th>Notes</th><th></th></tr></thead>
+          <thead><tr><th></th><th>Name</th><th>Team</th><th>Position</th><th>Base</th><th>Status</th><th>Notes</th><th></th></tr></thead>
           <tbody id="playerTableBody"></tbody>
         </table>
       </div>
@@ -362,9 +372,12 @@ details summary{ cursor:pointer; font-weight:700; color:var(--navy); font-family
     <div class="card scoreboard hidden" id="scoreboardCard">
       <div class="sb-stamp hidden" id="sbStamp">SOLD</div>
       <div class="sb-top">
-        <div>
-          <p class="sb-player-name" id="sbName">—</p>
-          <p class="sb-player-meta" id="sbMeta">—</p>
+        <div class="row" style="gap:14px; align-items:center; position:relative; z-index:1;">
+          <img class="sb-photo" id="sbPhoto" src="" alt="" style="display:none;">
+          <div>
+            <p class="sb-player-name" id="sbName">—</p>
+            <p class="sb-player-meta" id="sbMeta">—</p>
+          </div>
         </div>
         <div class="sb-timer">
           <svg width="78" height="78" viewBox="0 0 78 78">
@@ -406,7 +419,7 @@ details summary{ cursor:pointer; font-weight:700; color:var(--navy); font-family
       <p class="sub" id="myTeamSub"></p>
       <div style="overflow-x:auto;">
         <table>
-          <thead><tr><th>Name</th><th>Team / Village</th><th>Position</th><th>Paid</th></tr></thead>
+          <thead><tr><th></th><th>Name</th><th>Team / Village</th><th>Position</th><th>Paid</th></tr></thead>
           <tbody id="myTeamBody"></tbody>
         </table>
       </div>
@@ -418,7 +431,7 @@ details summary{ cursor:pointer; font-weight:700; color:var(--navy); font-family
       <p class="sub">Tap the star next to any available player to shortlist them (saved on the server, so it follows you across devices).</p>
       <div style="overflow-x:auto;">
         <table>
-          <thead><tr><th></th><th>Name</th><th>Team</th><th>Base</th></tr></thead>
+          <thead><tr><th></th><th></th><th>Name</th><th>Team</th><th>Base</th></tr></thead>
           <tbody id="wishlistTableBody"></tbody>
         </table>
       </div>
@@ -589,6 +602,16 @@ function rupeesToCrores(n){ return (Number(n||0) / 10000000); }
 function croresForDisplay(rupees){ return parseFloat(rupeesToCrores(rupees).toFixed(2)); }
 function findPlayer(id){ return state.players.find(p=>p.id===id); }
 function findCaptain(id){ return state.captains.find(c=>c.id===id); }
+// Photo thumbnails: show the image if one exists, otherwise a placeholder.
+function photoHTML(p, small){
+  const sz = small ? 'small' : '';
+  if(p && p.photo) return `<img class="player-thumb ${sz}" src="/uploads/${esc(p.photo)}" alt="" loading="lazy">`;
+  return `<span class="photo-empty ${sz}">👤</span>`;
+}
+// A small "camera" button that opens the file picker for this entity.
+function photoUploadHTML(entity, id){
+  return `<label class="btn btn-ghost btn-sm" style="cursor:pointer; padding:6px 10px;" title="Upload photo">📷<input type="file" accept="image/*" class="hidden" data-photo-upload="${entity}" data-photo-id="${id}"></label>`;
+}
 function me(){ return state ? state.me : null; }
 function isAdmin(){ return me() && me().role === 'admin'; }
 // A captain only counts as signed in if their record still exists in the
@@ -741,9 +764,15 @@ function renderSetup(){
   }else{
     list.innerHTML = state.captains.map(c=>`
       <div class="captain-chip">
-        <div>
-          <div class="name">${esc(c.name)}</div>
-          <div class="meta">${money(c.budget)} budget · ${c.has_passcode ? '🔒 passcode set' : '⚠ no passcode — cannot log in'}</div>
+        <div class="row" style="gap:10px; align-items:center;">
+          <span class="thumb-wrap">
+            ${photoHTML(c, true)}
+            <label class="photo-badge" title="Upload captain photo">📷<input type="file" accept="image/*" class="hidden" data-photo-upload="captain" data-photo-id="${c.id}"></label>
+          </span>
+          <div>
+            <div class="name">${esc(c.name)}</div>
+            <div class="meta">${money(c.budget)} budget · ${c.has_passcode ? '🔒 passcode set' : '⚠ no passcode — cannot log in'}</div>
+          </div>
         </div>
         <div class="row" style="gap:6px;">
           <button class="btn btn-ghost btn-sm" data-edit-captain="${c.id}">Edit</button>
@@ -856,6 +885,26 @@ document.getElementById('captainList').addEventListener('click', async (e)=>{
   }catch(err){ toast(err.message, 'error'); }
 });
 
+/* ---------------------------- photos ---------------------------- */
+// Uploads are handled by a delegated listener so the button survives the
+// every-1.5s re-render (a fresh file input is created each time).
+document.addEventListener('change', async (e)=>{
+  const input = e.target.closest('input[data-photo-upload]');
+  if(!input) return;
+  const file = input.files[0];
+  if(!file) return;
+  const fd = new FormData();
+  fd.append('entity', input.dataset.photoUpload);
+  fd.append('entity_id', input.dataset.photoId);
+  fd.append('file', file);
+  try{
+    await api('/api/upload_photo', { method:'POST', body: fd });
+    toast('Photo uploaded', 'success');
+    await fetchState();
+  }catch(err){ toast(err.message, 'error'); }
+  input.value = '';
+});
+
 /* ---------------------------- players ---------------------------- */
 document.getElementById('playerSearch').addEventListener('input', renderPlayers);
 document.getElementById('playerStatusFilter').addEventListener('change', renderPlayers);
@@ -916,13 +965,17 @@ function renderPlayers(){
     const statusLabel = p.status==='sold' ? `Sold${captain? ' · '+esc(captain.name):''}` : (p.status==='unsold'?('Unsold · ×' + (p.unsold_count||0)) : 'Available');
     const canRemove = p.status==='available' && state.auction.current_player_id !== p.id;
     return `<tr>
+      <td>${photoHTML(p)}</td>
       <td>${esc(p.name)}</td>
       <td>${esc(p.team)}</td>
       <td>${esc(p.position)}</td>
       <td>${money(p.base_price)}</td>
       <td><span class="badge ${badgeClass}">${statusLabel}</span></td>
       <td>${esc(p.notes)}</td>
-      <td>${canRemove ? `<button class="btn btn-ghost btn-sm" data-remove-player="${p.id}">Remove</button>` : ''}</td>
+      <td><div class="row" style="gap:6px;">
+        ${photoUploadHTML('player', p.id)}
+        ${canRemove ? `<button class="btn btn-ghost btn-sm" data-remove-player="${p.id}">Remove</button>` : ''}
+      </div></td>
     </tr>`;
   }).join('');
 }
@@ -1073,6 +1126,11 @@ function renderScoreboard(){
   document.getElementById('sbMeta').textContent = [player.team, player.position].filter(Boolean).join(' · ') || 'No team / position listed';
   document.getElementById('sbBidAmount').textContent = a.current_bidder_id ? money(a.current_bid) : 'Starting ' + money(player.base_price);
   document.getElementById('sbBidder').textContent = a.current_bidder_id ? (findCaptain(a.current_bidder_id)?.name || '—') : 'No bids yet';
+  const sbPhoto = document.getElementById('sbPhoto');
+  if(sbPhoto){
+    if(player.photo){ sbPhoto.src = '/uploads/' + player.photo; sbPhoto.style.display = 'inline-block'; }
+    else { sbPhoto.style.display = 'none'; }
+  }
   renderCountdown();
 
   // Actions differ by role
@@ -1281,7 +1339,7 @@ function renderMyTeam(){
 
   empty.classList.toggle('hidden', my.length>0);
   tbody.innerHTML = my.length
-    ? my.map(p=>`<tr><td>${esc(p.name)}</td><td>${esc(p.team)}</td><td>${esc(p.position)}</td><td>${money(p.sold_price)}</td></tr>`).join('')
+    ? my.map(p=>`<tr><td>${photoHTML(p, true)}</td><td>${esc(p.name)}</td><td>${esc(p.team)}</td><td>${esc(p.position)}</td><td>${money(p.sold_price)}</td></tr>`).join('')
     : '';
 }
 
@@ -1297,13 +1355,14 @@ function renderWishlist(){
   const mine = (state.wishlists[String(me().captain_id)] || []).map(String);
   const available = state.players.filter(p=>p.status==='available');
   if(available.length===0){
-    tbody.innerHTML = '<tr><td colspan="4" class="empty">No available players right now.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5" class="empty">No available players right now.</td></tr>';
     return;
   }
   tbody.innerHTML = available.map(p=>{
     const active = mine.includes(String(p.id));
     return `<tr>
       <td><span class="wishlist-star ${active?'active':''}" data-wishlist-toggle="${p.id}">★</span></td>
+      <td>${photoHTML(p, true)}</td>
       <td>${esc(p.name)}</td>
       <td>${esc(p.team)}</td>
       <td>${money(p.base_price)}</td>

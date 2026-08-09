@@ -47,8 +47,14 @@ import sqlite3
 from functools import wraps
 
 from flask import (
-    Flask, request, session, jsonify, render_template, Response, g
+    Flask, request, session, jsonify, render_template, Response, g,
+    send_from_directory,
 )
+
+try:
+    from PIL import Image
+except ImportError:
+    Image = None
 
 # ------------------------------------------------------------------
 # Configuration & paths
@@ -56,12 +62,14 @@ from flask import (
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, 'auction.db')
 SECRET_FILE = os.path.join(BASE_DIR, '.secret_key')
+PHOTOS_DIR = os.path.join(BASE_DIR, 'photos')
 
 app = Flask(__name__)
 
 app.config['JSON_AS_ASCII'] = False            # keep ₹, €, $ etc. unescaped
-app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024  # 2 MB upload cap for CSV
+app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024  # 10 MB upload cap (photos)
 app.config['TEMPLATES_AUTO_RELOAD'] = True     # template edits show up without a restart
+os.makedirs(PHOTOS_DIR, exist_ok=True)         # folder for uploaded photos
 
 
 def _load_secret_key():
@@ -112,7 +120,8 @@ def init_db():
             name      TEXT NOT NULL,
             passcode  TEXT NOT NULL DEFAULT '',
             budget    INTEGER NOT NULL DEFAULT 0,
-            remaining INTEGER NOT NULL DEFAULT 0
+            remaining INTEGER NOT NULL DEFAULT 0,
+            photo     TEXT NOT NULL DEFAULT ''
         );
         CREATE TABLE IF NOT EXISTS players (
             id            INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -124,7 +133,8 @@ def init_db():
             status        TEXT NOT NULL DEFAULT 'available',
             sold_to       INTEGER,
             sold_price    INTEGER,
-            unsold_count  INTEGER NOT NULL DEFAULT 0
+            unsold_count  INTEGER NOT NULL DEFAULT 0,
+            photo         TEXT NOT NULL DEFAULT ''
         );
         CREATE TABLE IF NOT EXISTS wishlists (
             captain_id INTEGER NOT NULL,
@@ -146,13 +156,18 @@ def init_db():
             last_result       TEXT
         );
     ''')
-    # Migration: add unsold_count to any players table created before the
-    # rebid feature existed (CREATE TABLE IF NOT EXISTS won't add columns).
-    cols = [row['name'] for row in db.execute('PRAGMA table_info(players)')]
-    if 'unsold_count' not in cols:
+    # Migrations: add columns to any tables created before those features
+    # existed (CREATE TABLE IF NOT EXISTS won't add columns).
+    p_cols = [row['name'] for row in db.execute('PRAGMA table_info(players)')]
+    if 'unsold_count' not in p_cols:
         db.execute(
             "ALTER TABLE players ADD COLUMN unsold_count INTEGER NOT NULL DEFAULT 0"
         )
+    if 'photo' not in p_cols:
+        db.execute("ALTER TABLE players ADD COLUMN photo TEXT NOT NULL DEFAULT ''")
+    c_cols = [row['name'] for row in db.execute('PRAGMA table_info(captains)')]
+    if 'photo' not in c_cols:
+        db.execute("ALTER TABLE captains ADD COLUMN photo TEXT NOT NULL DEFAULT ''")
     # Seed a single auction row if it doesn't exist yet.
     db.execute('INSERT OR IGNORE INTO auction (id) VALUES (1)')
     # Seed default settings.
@@ -635,6 +650,11 @@ def import_csv():
     if 'file' not in request.files:
         return jsonify({'error': 'No file uploaded'}), 400
     file = request.files['file']
+    file.seek(0, os.SEEK_END)
+    size = file.tell()
+    file.seek(0)
+    if size > 2 * 1024 * 1024:
+        return jsonify({'error': 'CSV must be under 2 MB'}), 400
     try:
         text = file.read().decode('utf-8-sig')
     except UnicodeDecodeError:
@@ -684,6 +704,92 @@ def import_csv():
         added += 1
     db.commit()
     return ok({'added': added})
+
+
+# ------------------------------------------------------------------
+# Photos (admin)
+# ------------------------------------------------------------------
+def _save_photo(file, entity, entity_id, old_photo):
+    """Resize an uploaded image to a small JPEG thumbnail on disk.
+
+    Returns (filename, None) on success or (None, error) on failure. The
+    filename embeds a timestamp so browsers never serve a stale cached image."""
+    if Image is None:
+        return None, 'Pillow is not installed — install it (pip install Pillow) to upload photos'
+    try:
+        img = Image.open(file.stream)
+        img.thumbnail((300, 300))
+        img = img.convert('RGB')
+    except Exception:
+        return None, 'Could not read that image — upload a valid JPG/PNG'
+    prefix = 'player' if entity == 'player' else 'captain'
+    # Millisecond precision avoids two uploads in the same second producing
+    # the same filename (which would otherwise delete the file just written).
+    filename = '{}_{}_{}.jpg'.format(prefix, entity_id, int(time.time() * 1000))
+    os.makedirs(PHOTOS_DIR, exist_ok=True)
+    try:
+        img.save(os.path.join(PHOTOS_DIR, filename), 'JPEG', quality=82)
+    except Exception:
+        return None, 'Could not save the image on the server'
+    # Remove the previous photo so old thumbnails don't pile up on disk.
+    # Never delete the file we just wrote (same-second re-upload).
+    if old_photo and old_photo != filename:
+        old_path = os.path.join(PHOTOS_DIR, os.path.basename(old_photo))
+        if os.path.exists(old_path):
+            try:
+                os.remove(old_path)
+            except OSError:
+                pass
+    return filename, None
+
+
+@app.route('/api/upload_photo', methods=['POST'])
+@admin_required
+def upload_photo():
+    """Attach a photo to a player or captain. Multipart form with fields
+    entity ('player'|'captain'), entity_id and file."""
+    data = request.form
+    entity = data.get('entity')
+    try:
+        entity_id = int(data.get('entity_id'))
+    except (TypeError, ValueError):
+        return jsonify({'error': 'Missing entity id'}), 400
+    if entity not in ('player', 'captain'):
+        return jsonify({'error': 'entity must be player or captain'}), 400
+    if 'file' not in request.files or not request.files['file'].filename:
+        return jsonify({'error': 'No file uploaded'}), 400
+
+    db = get_db()
+    if entity == 'player':
+        row = db.execute(
+            'SELECT * FROM players WHERE id = ?', (entity_id,)
+        ).fetchone()
+        if not row:
+            return jsonify({'error': 'Player not found'}), 404
+    else:
+        row = db.execute(
+            'SELECT * FROM captains WHERE id = ?', (entity_id,)
+        ).fetchone()
+        if not row:
+            return jsonify({'error': 'Captain not found'}), 404
+
+    filename, error = _save_photo(request.files['file'], entity, entity_id, row['photo'])
+    if error:
+        return jsonify({'error': error}), 400
+    if entity == 'player':
+        db.execute('UPDATE players SET photo = ? WHERE id = ?', (filename, entity_id))
+    else:
+        db.execute('UPDATE captains SET photo = ? WHERE id = ?', (filename, entity_id))
+    db.commit()
+    return ok({'photo': filename})
+
+
+@app.route('/uploads/<path:filename>')
+def uploads(filename):
+    """Serve an uploaded photo. Guarded against path traversal."""
+    if filename != os.path.basename(filename):
+        return jsonify({'error': 'Bad file name'}), 400
+    return send_from_directory(PHOTOS_DIR, filename)
 
 
 # ------------------------------------------------------------------
@@ -874,6 +980,16 @@ def state():
 @admin_required
 def reset():
     db = get_db()
+    # Remove uploaded photos along with the records.
+    for tbl in ('players', 'captains'):
+        for row in db.execute('SELECT photo FROM {}'.format(tbl)).fetchall():
+            if row['photo']:
+                path = os.path.join(PHOTOS_DIR, os.path.basename(row['photo']))
+                if os.path.exists(path):
+                    try:
+                        os.remove(path)
+                    except OSError:
+                        pass
     db.execute('DELETE FROM players')
     db.execute('DELETE FROM captains')
     db.execute('DELETE FROM bid_log')
