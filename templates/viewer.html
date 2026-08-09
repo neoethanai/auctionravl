@@ -108,7 +108,10 @@ main{ max-width:1200px; margin:0 auto; padding:22px 20px 60px; }
 .team-grid{ display:grid; gap:14px; grid-template-columns:repeat(auto-fill, minmax(280px,1fr)); }
 .team-card{ background:var(--sand); border-radius:var(--radius); padding:16px 18px; box-shadow:var(--shadow); border-top:4px solid var(--teal); }
 .team-card.final{ border-top-color:var(--gold); }
-.team-card h3{ font-family:var(--font-display); text-transform:uppercase; font-size:15px; letter-spacing:0.5px; margin:0 0 2px; color:var(--navy); }
+.team-card .team-head{ display:flex; align-items:center; gap:10px; margin-bottom:4px; }
+.team-card h3{ font-family:var(--font-display); text-transform:uppercase; font-size:15px; letter-spacing:0.5px; margin:0; color:var(--navy); }
+.team-avatar{ width:38px; height:38px; object-fit:cover; border-radius:10px; border:1.5px solid var(--navy); background:#fff; flex:none; }
+.team-avatar-empty{ display:inline-flex; align-items:center; justify-content:center; width:38px; height:38px; border-radius:10px; border:1.5px dashed var(--navy); color:var(--muted); font-size:15px; background:#fff; flex:none; }
 .team-card .meta{ font-family:var(--font-mono); font-size:12px; color:var(--muted); margin-bottom:10px; }
 .team-card ul{ list-style:none; margin:0; padding:0; }
 .team-card li{ padding:6px 0; border-bottom:1px dashed var(--line); font-size:13.5px; color:var(--ink); display:flex; justify-content:space-between; gap:8px; }
@@ -311,9 +314,12 @@ function renderTeams(finalMode){
     const rows = members.length
       ? members.map(p=>`<li>${thumbHTML(p)}<span>${esc(p.name)}</span><span class="p">${p.sold_price ? money(p.sold_price) : ''}</span></li>`).join('')
       : '<div class="empty-list">No players yet</div>';
+    const avatar = c.photo
+      ? `<img class="team-avatar" src="/uploads/${esc(c.photo)}" alt="" loading="lazy">`
+      : '<span class="team-avatar-empty">👤</span>';
     return `
       <div class="team-card ${finalMode?'final':''}">
-        <h3>${esc(c.name)}</h3>
+        <div class="team-head">${avatar}<h3>${esc(c.name)}</h3></div>
         <div class="meta">${members.length} player(s) · spent ${money(spent)} · left ${money(c.remaining)}</div>
         <ul>${rows}</ul>
       </div>`;
