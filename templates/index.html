@@ -136,7 +136,7 @@ tr:hover td{ background:rgba(239,108,31,0.05); }
 .photo-empty{ display:inline-flex; align-items:center; justify-content:center; width:42px; height:42px; border-radius:8px; border:1.5px dashed var(--line); color:var(--muted); font-size:16px; background:#fff; vertical-align:middle; }
 .photo-empty.small{ width:30px; height:30px; font-size:12px; }
 .sb-photo{ width:74px; height:74px; object-fit:cover; border-radius:14px; border:3px solid rgba(255,255,255,0.25); background:var(--navy-2); }
-.photo-badge{ position:absolute; bottom:-4px; right:-4px; background:var(--navy); color:var(--sand); border-radius:50%; width:20px; height:20px; display:flex; align-items:center; justify-content:center; font-size:11px; cursor:pointer; border:1.5px solid var(--sand); }
+.photo-badge{ position:absolute; bottom:-4px; right:-4px; background:var(--navy); color:var(--sand); border-radius:50%; width:20px; height:20px; padding:0; display:flex; align-items:center; justify-content:center; font-size:11px; cursor:pointer; border:1.5px solid var(--sand); }
 .thumb-wrap{ position:relative; display:inline-block; line-height:0; }
 .thumb-wrap .photo-empty{ display:inline-flex; }
 .thumb-wrap .photo-badge{ position:absolute; bottom:-4px; right:-4px; }
@@ -608,9 +608,12 @@ function photoHTML(p, small){
   if(p && p.photo) return `<img class="player-thumb ${sz}" src="/uploads/${esc(p.photo)}" alt="" loading="lazy">`;
   return `<span class="photo-empty ${sz}">👤</span>`;
 }
-// A small "camera" button that opens the file picker for this entity.
+// Which entity the persistent file picker is currently for.
+let photoTarget = null;
+// A small "camera" button that opens the persistent file picker. The picker
+// input lives outside the re-rendered DOM so the selection survives polling.
 function photoUploadHTML(entity, id){
-  return `<label class="btn btn-ghost btn-sm" style="cursor:pointer; padding:6px 10px;" title="Upload photo">📷<input type="file" accept="image/*" class="hidden" data-photo-upload="${entity}" data-photo-id="${id}"></label>`;
+  return `<button type="button" class="btn btn-ghost btn-sm" title="Upload photo" data-photo-upload="${entity}" data-photo-id="${id}">📷</button>`;
 }
 function me(){ return state ? state.me : null; }
 function isAdmin(){ return me() && me().role === 'admin'; }
@@ -767,7 +770,7 @@ function renderSetup(){
         <div class="row" style="gap:10px; align-items:center;">
           <span class="thumb-wrap">
             ${photoHTML(c, true)}
-            <label class="photo-badge" title="Upload captain photo">📷<input type="file" accept="image/*" class="hidden" data-photo-upload="captain" data-photo-id="${c.id}"></label>
+            <button type="button" class="photo-badge" title="Upload captain photo" data-photo-upload="captain" data-photo-id="${c.id}">📷</button>
           </span>
           <div>
             <div class="name">${esc(c.name)}</div>
@@ -886,16 +889,22 @@ document.getElementById('captainList').addEventListener('click', async (e)=>{
 });
 
 /* ---------------------------- photos ---------------------------- */
-// Uploads are handled by a delegated listener so the button survives the
-// every-1.5s re-render (a fresh file input is created each time).
-document.addEventListener('change', async (e)=>{
-  const input = e.target.closest('input[data-photo-upload]');
-  if(!input) return;
+// Clicking any camera button sets the target then opens the single persistent
+// picker. The picker input is never re-created by polling, so the chosen file
+// is still there when the 'change' event fires.
+document.addEventListener('click', (e)=>{
+  const btn = e.target.closest('button[data-photo-upload]');
+  if(!btn) return;
+  photoTarget = { entity: btn.dataset.photoUpload, id: btn.dataset.photoId };
+  document.getElementById('photoFileInput').click();
+});
+document.getElementById('photoFileInput').addEventListener('change', async ()=>{
+  const input = document.getElementById('photoFileInput');
   const file = input.files[0];
-  if(!file) return;
+  if(!file || !photoTarget) return;
   const fd = new FormData();
-  fd.append('entity', input.dataset.photoUpload);
-  fd.append('entity_id', input.dataset.photoId);
+  fd.append('entity', photoTarget.entity);
+  fd.append('entity_id', photoTarget.id);
   fd.append('file', file);
   try{
     await api('/api/upload_photo', { method:'POST', body: fd });
@@ -1515,5 +1524,9 @@ function renderAll(){
 // first paint
 fetchState();
 </script>
+<!-- Persistent file input. It lives OUTSIDE the every-1.5s re-rendered DOM:
+    if the input were rebuilt while the OS file picker is open, the selection
+    would be lost and the 'change' event would fire on a stale node. -->
+<input type="file" id="photoFileInput" accept="image/*" class="hidden">
 </body>
 </html>
