@@ -756,14 +756,18 @@ function renderRoleBadge(){
 function renderSetup(){
   if(!state) return;
   const s = state.settings;
-  setFieldVal('setTournamentName', s.tournament_name);
-  setFieldVal('setCurrency', s.currency);
-  setFieldVal('setIncrement', croresForDisplay(s.increment));
-  setFieldVal('setTimer', s.timer_seconds);
-  setFieldVal('setDefaultBudget', croresForDisplay(s.default_budget));
-  setFieldVal('setCloseMode', s.close_mode);
-  setFieldVal('setTimerMode', s.timer_mode);
-  setFieldVal('setAdminPasscode', '');
+  // Once the admin edits any setting, polling must never clobber their
+  // unsaved changes. The form re-syncs after a successful Save.
+  if(!settingsDirty){
+    setFieldVal('setTournamentName', s.tournament_name);
+    setFieldVal('setCurrency', s.currency);
+    setFieldVal('setIncrement', croresForDisplay(s.increment));
+    setFieldVal('setTimer', s.timer_seconds);
+    setFieldVal('setDefaultBudget', croresForDisplay(s.default_budget));
+    setFieldVal('setCloseMode', s.close_mode);
+    setFieldVal('setTimerMode', s.timer_mode);
+    setFieldVal('setAdminPasscode', '');
+  }
   // Warn when the admin account is wide open.
   const adminWarn = document.getElementById('adminPassWarning');
   if(adminWarn) adminWarn.classList.toggle('hidden', !!s.admin_passcode_set);
@@ -822,6 +826,17 @@ function cancelEditCaptain(){
   document.getElementById('btnCancelEdit').classList.add('hidden');
 }
 
+// Editing any settings field marks the form dirty so the 1.5s poll can't
+// overwrite it mid-edit. Cleared only by a successful save.
+let settingsDirty = false;
+['setTournamentName','setCurrency','setIncrement','setTimer','setDefaultBudget',
+ 'setCloseMode','setTimerMode','setAdminPasscode'].forEach(id=>{
+  const el = document.getElementById(id);
+  if(!el) return;
+  el.addEventListener('input', ()=> settingsDirty = true);
+  if(el.tagName === 'SELECT') el.addEventListener('change', ()=> settingsDirty = true);
+});
+
 document.getElementById('btnSaveSettings').addEventListener('click', async ()=>{
   try{
     await api('/api/settings', jsonBody({
@@ -833,6 +848,7 @@ document.getElementById('btnSaveSettings').addEventListener('click', async ()=>{
       close_mode: document.getElementById('setCloseMode').value,
       timer_mode: document.getElementById('setTimerMode').value,
     }));
+    settingsDirty = false;
     toast('Settings saved', 'success');
     await fetchState();
   }catch(err){ toast(err.message, 'error'); }
@@ -843,6 +859,7 @@ document.getElementById('btnSaveAdminPass').addEventListener('click', async ()=>
     await api('/api/settings', jsonBody({
       admin_passcode: document.getElementById('setAdminPasscode').value.trim(),
     }));
+    settingsDirty = false;
     toast('Admin passcode saved', 'success');
     await fetchState();
   }catch(err){ toast(err.message, 'error'); }
