@@ -545,6 +545,12 @@ Anand K,Team B,Outside Hitter,150,</pre>
 
 <div class="footer-note">RAVL Auction Room · live multi-device auction board · Powered by Niftyflow</div>
 
+<!-- Persistent file input. It lives OUTSIDE the every-1.5s re-rendered DOM:
+    if the input were rebuilt while the OS file picker is open, the selection
+    would be lost and the 'change' event would fire on a stale node. It must
+    appear BEFORE the script so the change listener can attach to it. -->
+<input type="file" id="photoFileInput" accept="image/*" class="hidden">
+
 <script>
 /* ============================================================================
    RAVL AUCTION ROOM (Flask + SQLite edition) — frontend logic
@@ -1524,9 +1530,5 @@ function renderAll(){
 // first paint
 fetchState();
 </script>
-<!-- Persistent file input. It lives OUTSIDE the every-1.5s re-rendered DOM:
-    if the input were rebuilt while the OS file picker is open, the selection
-    would be lost and the 'change' event would fire on a stale node. -->
-<input type="file" id="photoFileInput" accept="image/*" class="hidden">
 </body>
 </html>
