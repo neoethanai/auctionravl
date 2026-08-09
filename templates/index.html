@@ -239,13 +239,22 @@ details summary{ cursor:pointer; font-weight:700; color:var(--navy); font-family
           <div class="field"><label>Currency symbol</label><input type="text" id="setCurrency" maxlength="3" placeholder="₹"></div>
           <div class="field"><label>Minimum bid increment (₹ Crore)</label><input type="number" id="setIncrement" min="0.01" step="0.01" value="1"><div id="incrementHint" class="field-hint"></div></div>
           <div class="field"><label>Timer duration (seconds)</label><input type="number" id="setTimer" min="5" value="30"></div>
+          <div class="field">
+            <label>Bid timer behavior</label>
+            <select id="setTimerMode">
+              <option value="extend">Extend on each bid — countdown resets to full</option>
+              <option value="fixed">Fixed window — countdown never resets</option>
+            </select>
+            <div class="field-hint" id="timerModeHint">Fixed window = total time to bid, from "Timer duration". Extend = classic going-going-gone.</div>
+          </div>
           <div class="field"><label>Default captain budget (₹ Crore)</label><input type="number" id="setDefaultBudget" min="0" step="0.01" value="1000"><div id="budgetHint" class="field-hint"></div></div>
           <div class="field">
             <label>How does a player get sold?</label>
             <select id="setCloseMode">
               <option value="timer">Timer expiry — last bidder wins automatically</option>
-              <option value="admin">Admin manually clicks "Sell"</option>
+              <option value="admin">Admin manually clicks "Sell" / "Unsold"</option>
             </select>
+            <div class="field-hint" id="closeModeHint">Admin mode: timer is just a reminder — bidding stays open until you close the round.</div>
           </div>
         </div>
         <button class="btn btn-primary" id="btnSaveSettings">Save Settings</button>
@@ -753,6 +762,7 @@ function renderSetup(){
   setFieldVal('setTimer', s.timer_seconds);
   setFieldVal('setDefaultBudget', croresForDisplay(s.default_budget));
   setFieldVal('setCloseMode', s.close_mode);
+  setFieldVal('setTimerMode', s.timer_mode);
   setFieldVal('setAdminPasscode', '');
   // Warn when the admin account is wide open.
   const adminWarn = document.getElementById('adminPassWarning');
@@ -821,6 +831,7 @@ document.getElementById('btnSaveSettings').addEventListener('click', async ()=>{
       timer_seconds: Number(document.getElementById('setTimer').value),
       default_budget: Math.round(Number(document.getElementById('setDefaultBudget').value) * 1e7),
       close_mode: document.getElementById('setCloseMode').value,
+      timer_mode: document.getElementById('setTimerMode').value,
     }));
     toast('Settings saved', 'success');
     await fetchState();

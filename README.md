@@ -119,9 +119,23 @@ WantedBy=multi-user.target
    (e.g. `2` = ₹2 Crore, decimals are not allowed; a live preview shows the
    exact rupees). The bid can't go below the
    minimum increment nor above the captain's remaining budget — both enforced
-   on the server. Every bid resets the countdown. On timer expiry (or admin
-   **Sell**), the player goes to the winning captain and their budget is
-   deducted. Captains can also star players into a personal wishlist.
+   on the server. On timer expiry (or admin **Sell**), the player goes to the
+   winning captain and their budget is deducted. Captains can also star players
+   into a personal wishlist.
+
+   **Bid timer behavior (Settings)** — two modes, admin-chosen:
+   - *Extend on each bid* (default): every bid resets the countdown to the full
+     timer length (classic "going once, going twice" — the round only closes
+     after a full countdown of silence).
+   - *Fixed window*: the countdown is a hard total window set by "Timer
+     duration" and **never resets** when someone bids. When it hits zero the
+     round resolves at the deadline.
+   The timer length itself is the **Timer duration (seconds)** setting in both
+   modes. Combined with the existing **How does a player get sold?** setting:
+   - *Timer expiry* — at zero the round auto-closes: last bidder wins, or
+     unsold if nobody bid. In a fixed window this means a hard deadline.
+   - *Admin clicks Sell / Unsold* — the timer is just a reminder; bidding stays
+     open past zero until the admin closes the round manually.
 
    **Rebidding unsold players** — players marked *Unsold* are never lost. The
    admin can nominate them again: they appear in the nominate dropdown tagged

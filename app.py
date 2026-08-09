@@ -178,6 +178,7 @@ def init_db():
         'timer_seconds': 30,
         'default_budget': 10000,
         'close_mode': 'timer',       # 'timer' or 'admin'
+        'timer_mode': 'extend',      # 'extend' or 'fixed'
         'viewer_mode': 'live',       # what the public /view screen shows
         'admin_passcode': '',
     }
@@ -204,6 +205,7 @@ def settings_dict():
         'timer_seconds': int(s.get('timer_seconds', 30)),
         'default_budget': int(s.get('default_budget', 10000)),
         'close_mode': s.get('close_mode', 'timer'),
+        'timer_mode': s.get('timer_mode', 'extend'),
         'viewer_mode': s.get('viewer_mode', 'live'),
         'admin_passcode': s.get('admin_passcode', ''),
     }
@@ -369,6 +371,7 @@ def build_state():
             'timer_seconds': settings['timer_seconds'],
             'default_budget': settings['default_budget'],
             'close_mode': settings['close_mode'],
+            'timer_mode': settings['timer_mode'],
             'viewer_mode': settings['viewer_mode'],
             'admin_passcode_set': bool(settings['admin_passcode']),
         },
@@ -483,6 +486,8 @@ def save_settings():
         update_setting(db, 'default_budget', _int(data.get('default_budget'), 10000))
     if 'close_mode' in data and data.get('close_mode') in ('timer', 'admin'):
         update_setting(db, 'close_mode', data['close_mode'])
+    if 'timer_mode' in data and data.get('timer_mode') in ('extend', 'fixed'):
+        update_setting(db, 'timer_mode', data['timer_mode'])
     if 'viewer_mode' in data and data.get('viewer_mode') in ('live', 'final'):
         update_setting(db, 'viewer_mode', data['viewer_mode'])
     if 'admin_passcode' in data:
@@ -888,7 +893,18 @@ def bid():
         return jsonify({'error': 'Not enough budget remaining for that bid'}), 400
 
     settings = settings_dict()
-    timer_end = int(time.time() * 1000) + settings['timer_seconds'] * 1000
+    now = int(time.time() * 1000)
+    # In timer-close mode a bid that lands after the countdown expired is
+    # rejected — that round has already been finalised. In admin-close mode
+    # the timer is only a reminder, so bids stay open until the admin closes.
+    if settings['close_mode'] == 'timer' and auction['timer_end'] and now >= auction['timer_end']:
+        return jsonify({'error': 'This round has already closed'}), 400
+    # 'extend' (default): every bid resets the countdown to the full length.
+    # 'fixed': the countdown is a hard total window and never resets.
+    if settings['timer_mode'] == 'extend':
+        timer_end = now + settings['timer_seconds'] * 1000
+    else:
+        timer_end = auction['timer_end'] or (now + settings['timer_seconds'] * 1000)
     db.execute(
         'UPDATE auction SET current_bid = ?, current_bidder_id = ?, '
         'timer_end = ? WHERE id = 1',
