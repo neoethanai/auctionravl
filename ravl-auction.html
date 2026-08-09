@@ -1,0 +1,1502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RAVL Auction Room</title>
+<style>
+/* ============================================================
+   RAVL AUCTION ROOM — design tokens
+   Court navy + volleyball orange + net teal, scoreboard styling.
+   No external fonts/assets — fully self-contained.
+   ============================================================ */
+:root{
+  --navy:#0B1F3A;
+  --navy-2:#122A4D;
+  --navy-3:#1B3B66;
+  --sand:#F5EEE2;
+  --sand-2:#EFE4D0;
+  --orange:#EF6C1F;
+  --orange-2:#FF8A3D;
+  --teal:#17958A;
+  --gold:#F4B942;
+  --red:#D8494B;
+  --ink:#12181F;
+  --muted:#66707C;
+  --line:rgba(11,31,58,0.12);
+  --white:#FFFFFF;
+  --radius:14px;
+  --radius-sm:8px;
+  --shadow:0 10px 30px rgba(11,31,58,0.18);
+  --font-display: Arial Black, "Segoe UI Black", "Helvetica Neue", sans-serif;
+  --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: "SF Mono", "JetBrains Mono", "Consolas", "Menlo", monospace;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:
+    repeating-linear-gradient(135deg, rgba(255,255,255,0.02) 0 2px, transparent 2px 34px),
+    radial-gradient(circle at 10% -10%, var(--navy-3) 0%, var(--navy) 45%),
+    var(--navy);
+  color:var(--ink);
+  font-family:var(--font-body);
+  min-height:100vh;
+  -webkit-font-smoothing:antialiased;
+}
+::selection{ background:var(--orange); color:#fff; }
+button{ font-family:inherit; cursor:pointer; }
+input,select,textarea{ font-family:inherit; }
+a{ color:inherit; }
+.hidden{ display:none !important; }
+
+/* ---------- App shell ---------- */
+.app-header{
+  padding:18px 20px 0;
+  max-width:1180px;
+  margin:0 auto;
+}
+.brand{
+  display:flex;
+  align-items:center;
+  gap:14px;
+  color:var(--sand);
+  margin-bottom:14px;
+}
+.brand-mark{
+  width:44px;height:44px;border-radius:50%;
+  background:conic-gradient(var(--orange) 0deg 90deg, var(--sand) 90deg 180deg, var(--orange) 180deg 270deg, var(--sand) 270deg 360deg);
+  border:3px solid var(--sand);
+  flex:0 0 auto;
+  box-shadow:0 4px 14px rgba(0,0,0,0.35);
+}
+.brand h1{
+  font-family:var(--font-display);
+  font-size:22px;
+  letter-spacing:0.5px;
+  margin:0;
+  text-transform:uppercase;
+}
+.brand span{
+  display:block;
+  font-family:var(--font-mono);
+  font-size:11px;
+  color:var(--orange-2);
+  letter-spacing:2px;
+  margin-top:2px;
+}
+.role-badge{
+  margin-left:auto;
+  font-family:var(--font-mono);
+  font-size:12px;
+  background:rgba(255,255,255,0.08);
+  border:1px solid rgba(255,255,255,0.18);
+  padding:7px 12px;
+  border-radius:999px;
+  color:var(--sand);
+  display:flex;
+  align-items:center;
+  gap:8px;
+  white-space:nowrap;
+}
+.role-badge button{
+  background:none;border:none;color:var(--orange-2);font-size:11px;
+  text-decoration:underline;padding:0;
+}
+
+/* Tab nav styled like a net line */
+.tabs{
+  display:flex;
+  gap:4px;
+  border-bottom:2px solid rgba(255,255,255,0.14);
+  padding-bottom:0;
+  overflow-x:auto;
+}
+.tab-btn{
+  background:transparent;
+  border:none;
+  color:rgba(245,238,226,0.6);
+  font-family:var(--font-display);
+  font-size:13px;
+  letter-spacing:1px;
+  text-transform:uppercase;
+  padding:12px 18px;
+  border-radius:10px 10px 0 0;
+  position:relative;
+  white-space:nowrap;
+}
+.tab-btn:hover{ color:var(--sand); }
+.tab-btn.active{
+  color:var(--navy);
+  background:var(--sand);
+}
+.tab-btn .count{
+  font-family:var(--font-mono);
+  font-size:10px;
+  background:var(--orange);
+  color:#fff;
+  border-radius:999px;
+  padding:1px 6px;
+  margin-left:6px;
+}
+
+main{
+  max-width:1180px;
+  margin:0 auto;
+  padding:22px 20px 60px;
+}
+.view{ display:none; animation:fadein .25s ease; }
+.view.active{ display:block; }
+@keyframes fadein{ from{opacity:0; transform:translateY(4px);} to{opacity:1; transform:translateY(0);} }
+
+/* ---------- Cards / panels ---------- */
+.card{
+  background:var(--sand);
+  border-radius:var(--radius);
+  padding:20px;
+  box-shadow:var(--shadow);
+  margin-bottom:18px;
+}
+.card h2{
+  font-family:var(--font-display);
+  text-transform:uppercase;
+  letter-spacing:0.5px;
+  font-size:16px;
+  margin:0 0 4px;
+  color:var(--navy);
+}
+.card .sub{
+  color:var(--muted);
+  font-size:13px;
+  margin:0 0 16px;
+}
+.grid{ display:grid; gap:16px; }
+.grid.cols-2{ grid-template-columns:1fr 1fr; }
+.grid.cols-3{ grid-template-columns:repeat(3,1fr); }
+.grid.cols-4{ grid-template-columns:repeat(4,1fr); }
+@media (max-width:820px){
+  .grid.cols-2, .grid.cols-3, .grid.cols-4{ grid-template-columns:1fr; }
+}
+
+label{ font-size:12px; font-weight:700; color:var(--navy); display:block; margin-bottom:5px; letter-spacing:0.3px; }
+.field{ margin-bottom:12px; }
+input[type=text], input[type=number], input[type=password], select, textarea{
+  width:100%;
+  padding:10px 11px;
+  border:1.5px solid var(--line);
+  border-radius:var(--radius-sm);
+  background:#fff;
+  font-size:14px;
+  color:var(--ink);
+}
+input:focus, select:focus, textarea:focus{
+  outline:2px solid var(--orange);
+  outline-offset:1px;
+  border-color:var(--orange);
+}
+.row{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+.row.between{ justify-content:space-between; }
+
+.btn{
+  border:none;
+  border-radius:999px;
+  padding:10px 18px;
+  font-weight:700;
+  font-size:13px;
+  letter-spacing:0.3px;
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  transition:transform .12s ease, box-shadow .12s ease;
+}
+.btn:active{ transform:scale(0.96); }
+.btn-primary{ background:var(--orange); color:#fff; }
+.btn-primary:hover{ background:var(--orange-2); }
+.btn-teal{ background:var(--teal); color:#fff; }
+.btn-navy{ background:var(--navy); color:var(--sand); }
+.btn-ghost{ background:transparent; color:var(--navy); border:1.5px solid var(--line); }
+.btn-danger{ background:var(--red); color:#fff; }
+.btn-gold{ background:var(--gold); color:#3a2a00; }
+.btn:disabled{ opacity:0.45; cursor:not-allowed; transform:none; }
+.btn-sm{ padding:6px 12px; font-size:12px; }
+.btn-block{ width:100%; justify-content:center; }
+
+table{ width:100%; border-collapse:collapse; font-size:13.5px; }
+th{
+  text-align:left;
+  font-family:var(--font-mono);
+  font-size:11px;
+  letter-spacing:0.5px;
+  text-transform:uppercase;
+  color:var(--muted);
+  padding:8px 10px;
+  border-bottom:2px solid var(--line);
+}
+td{ padding:9px 10px; border-bottom:1px solid var(--line); vertical-align:middle; }
+tr:hover td{ background:rgba(239,108,31,0.05); }
+.badge{
+  display:inline-block;
+  font-family:var(--font-mono);
+  font-size:10.5px;
+  padding:3px 8px;
+  border-radius:999px;
+  font-weight:700;
+  letter-spacing:0.3px;
+}
+.badge-available{ background:#E7EEF7; color:var(--navy); }
+.badge-sold{ background:#E4F5E9; color:#1E7A44; }
+.badge-unsold{ background:#F7E4E4; color:var(--red); }
+.badge-live{ background:var(--gold); color:#3a2a00; animation:pulse 1.4s infinite; }
+@keyframes pulse{ 0%,100%{opacity:1;} 50%{opacity:0.55;} }
+
+.empty{
+  text-align:center;
+  padding:34px 10px;
+  color:var(--muted);
+  font-size:14px;
+}
+.empty strong{ display:block; color:var(--navy); font-size:15px; margin-bottom:4px; }
+
+.toast-wrap{
+  position:fixed; top:16px; right:16px; z-index:999;
+  display:flex; flex-direction:column; gap:8px;
+}
+.toast{
+  background:var(--navy); color:var(--sand);
+  padding:12px 16px; border-radius:10px;
+  font-size:13px; box-shadow:var(--shadow);
+  border-left:4px solid var(--orange);
+  max-width:300px;
+  animation:slidein .2s ease;
+}
+.toast.error{ border-left-color:var(--red); }
+.toast.success{ border-left-color:var(--teal); }
+@keyframes slidein{ from{ transform:translateX(20px); opacity:0;} to{transform:translateX(0); opacity:1;} }
+
+/* ---------- Setup: captain chips ---------- */
+.captain-chip{
+  background:#fff; border:1.5px solid var(--line); border-radius:12px;
+  padding:12px 14px; display:flex; justify-content:space-between; align-items:center; gap:10px;
+  margin-bottom:8px;
+}
+.captain-chip .name{ font-weight:700; color:var(--navy); }
+.captain-chip .meta{ font-family:var(--font-mono); font-size:12px; color:var(--muted); }
+
+/* ---------- Auction scoreboard (signature element) ---------- */
+.scoreboard{
+  background:radial-gradient(circle at 30% 0%, var(--navy-3), var(--navy));
+  border-radius:20px;
+  padding:26px;
+  color:var(--sand);
+  position:relative;
+  overflow:hidden;
+  border:2px solid rgba(255,255,255,0.08);
+}
+.scoreboard::before{
+  content:"";
+  position:absolute; inset:0;
+  background:repeating-linear-gradient(90deg, rgba(255,255,255,0.03) 0 1px, transparent 1px 40px);
+  pointer-events:none;
+}
+.sb-top{ display:flex; justify-content:space-between; align-items:flex-start; gap:16px; flex-wrap:wrap; }
+.sb-player-name{ font-family:var(--font-display); font-size:clamp(22px,4vw,34px); text-transform:uppercase; letter-spacing:0.5px; margin:0; }
+.sb-player-meta{ font-family:var(--font-mono); font-size:12.5px; color:var(--orange-2); margin-top:4px; }
+.sb-timer{
+  width:78px; height:78px; position:relative; flex:0 0 auto;
+}
+.sb-timer svg{ transform:rotate(-90deg); }
+.sb-timer .ring-bg{ fill:none; stroke:rgba(255,255,255,0.14); stroke-width:7; }
+.sb-timer .ring-fg{ fill:none; stroke:var(--gold); stroke-width:7; stroke-linecap:round; transition:stroke-dashoffset .25s linear, stroke .2s; }
+.sb-timer .ring-fg.low{ stroke:var(--red); }
+.sb-timer-num{
+  position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+  font-family:var(--font-mono); font-size:20px; font-weight:700;
+}
+.sb-mid{
+  display:grid; grid-template-columns:1fr 1fr; gap:20px;
+  margin:22px 0 10px; position:relative; z-index:1;
+}
+.sb-stat-label{ font-family:var(--font-mono); font-size:11px; letter-spacing:1.5px; color:rgba(245,238,226,0.55); text-transform:uppercase; }
+.sb-bid-amount{ font-family:var(--font-mono); font-size:clamp(30px,6vw,52px); font-weight:700; color:var(--gold); line-height:1.1; }
+.sb-bidder-name{ font-family:var(--font-display); font-size:20px; text-transform:uppercase; margin-top:2px; }
+.sb-stamp{
+  position:absolute; top:18px; right:18px;
+  font-family:var(--font-display); font-size:34px; color:var(--red);
+  border:5px solid var(--red); border-radius:10px;
+  padding:2px 14px; transform:rotate(10deg);
+  opacity:0.92; letter-spacing:2px; z-index:2;
+}
+.sb-stamp.unsold{ color:var(--muted); border-color:var(--muted); }
+.sb-actions{ display:flex; gap:10px; flex-wrap:wrap; margin-top:14px; position:relative; z-index:1; }
+
+.wishlist-star{ cursor:pointer; font-size:16px; color:#c9c2b3; }
+.wishlist-star.active{ color:var(--gold); }
+
+.feed{ max-height:220px; overflow-y:auto; font-family:var(--font-mono); font-size:12.5px; }
+.feed-item{ padding:6px 0; border-bottom:1px dashed var(--line); color:var(--navy); }
+.feed-item .t{ color:var(--muted); margin-right:6px; }
+
+.helpbox{
+  background:var(--sand-2); border-radius:var(--radius); padding:16px 18px; font-size:13px; color:var(--navy);
+  line-height:1.55;
+}
+.helpbox h3{ font-family:var(--font-display); font-size:14px; text-transform:uppercase; margin:14px 0 6px; }
+.helpbox h3:first-child{ margin-top:0; }
+.helpbox code{ background:#fff; padding:1px 6px; border-radius:4px; font-family:var(--font-mono); font-size:12px; }
+.helpbox pre{ background:#fff; padding:10px 12px; border-radius:8px; overflow-x:auto; font-family:var(--font-mono); font-size:12px; }
+details summary{ cursor:pointer; font-weight:700; color:var(--navy); font-family:var(--font-display); text-transform:uppercase; font-size:13px; letter-spacing:0.5px; }
+
+.footer-note{ text-align:center; color:rgba(245,238,226,0.45); font-size:11.5px; padding:20px 0 30px; font-family:var(--font-mono); }
+
+.search-bar{ display:flex; gap:10px; margin-bottom:14px; flex-wrap:wrap; }
+.search-bar input, .search-bar select{ width:auto; flex:1; min-width:140px; }
+
+.kpi{
+  background:#fff; border-radius:12px; padding:14px 16px; border:1.5px solid var(--line);
+}
+.kpi .num{ font-family:var(--font-mono); font-size:24px; font-weight:700; color:var(--navy); }
+.kpi .lbl{ font-size:11.5px; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; }
+
+.login-grid{ display:flex; gap:12px; flex-wrap:wrap; }
+.login-card{
+  flex:1; min-width:220px; background:#fff; border:1.5px solid var(--line); border-radius:12px; padding:16px;
+}
+</style>
+</head>
+<body>
+
+<div class="toast-wrap" id="toastWrap"></div>
+
+<div class="app-header">
+  <div class="brand">
+    <div class="brand-mark"></div>
+    <div>
+      <h1>RAVL Auction Room</h1>
+      <span id="tournamentTagline">SEASON AUCTION · LIVE BIDDING BOARD</span>
+      <span id="saveIndicator" style="display:block;font-family:var(--font-mono);font-size:10px;color:rgba(245,238,226,0.45);margin-top:2px;">Not saved yet</span>
+    </div>
+    <div class="role-badge" id="roleBadge">
+      Not signed in
+    </div>
+  </div>
+  <div class="card" id="storageWarning" style="display:none; background:#FDECEC; border:2px solid var(--red); margin-bottom:12px;">
+    <strong style="color:var(--red);">⚠ This browser is blocking local storage.</strong>
+    <span style="font-size:13px; color:var(--ink);"> Nothing you do here will be saved or resumable — captains, bids and sales will vanish on refresh. This usually means private/incognito mode or a browser setting. Switch to a normal browser tab/window before running the auction.</span>
+  </div>
+  <nav class="tabs" id="tabNav">
+    <button class="tab-btn" data-tab="setup">Setup</button>
+    <button class="tab-btn" data-tab="players">Players <span class="count" id="countPlayers">0</span></button>
+    <button class="tab-btn" data-tab="auction">Live Auction</button>
+    <button class="tab-btn" data-tab="results">Results</button>
+    <button class="tab-btn" data-tab="help">Read Me</button>
+  </nav>
+</div>
+
+<main>
+
+  <!-- ============================================================ SETUP ============================================================ -->
+  <section class="view" id="view-setup">
+    <div class="grid cols-2">
+      <div class="card">
+        <h2>Tournament Settings</h2>
+        <p class="sub">Configure currency and bidding rules. Saved automatically to this browser.</p>
+        <div class="grid cols-2">
+          <div class="field">
+            <label>Tournament name</label>
+            <input type="text" id="setTournamentName" placeholder="RAVL Season 4">
+          </div>
+          <div class="field">
+            <label>Currency symbol</label>
+            <input type="text" id="setCurrency" maxlength="3" placeholder="₹">
+          </div>
+          <div class="field">
+            <label>Minimum bid increment</label>
+            <input type="number" id="setIncrement" min="1" value="50">
+          </div>
+          <div class="field">
+            <label>Timer duration (seconds)</label>
+            <input type="number" id="setTimer" min="5" value="30">
+          </div>
+          <div class="field">
+            <label>Default captain budget</label>
+            <input type="number" id="setDefaultBudget" min="0" value="10000">
+          </div>
+          <div class="field">
+            <label>How does a player get sold?</label>
+            <select id="setCloseMode">
+              <option value="timer">Timer expiry — last bidder wins automatically</option>
+              <option value="admin">Admin manually clicks "Sell"</option>
+            </select>
+          </div>
+        </div>
+        <button class="btn btn-primary" id="btnSaveSettings">Save Settings</button>
+      </div>
+
+      <div class="card">
+        <h2>Captains</h2>
+        <p class="sub">Add each team captain, their optional passcode, and starting budget.</p>
+        <div id="captainList"></div>
+        <form id="captainForm" class="grid cols-3" style="margin-top:10px; align-items:end;">
+          <div class="field" style="margin-bottom:0;">
+            <label>Captain name</label>
+            <input type="text" id="capName" placeholder="e.g. Sanjeev Bhai" required>
+          </div>
+          <div class="field" style="margin-bottom:0;">
+            <label>Passcode (optional)</label>
+            <input type="text" id="capPasscode" placeholder="Leave blank for none">
+          </div>
+          <div class="field" style="margin-bottom:0;">
+            <label>Budget</label>
+            <input type="number" id="capBudget" min="0" placeholder="Auto-filled">
+          </div>
+          <button type="submit" class="btn btn-navy" style="grid-column:1/-1;">+ Add Captain</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Admin Passcode (optional)</h2>
+      <p class="sub">If set, anyone signing in as Admin must enter this passcode. Leave blank to allow open admin access on this device.</p>
+      <div class="row">
+        <input type="text" id="setAdminPasscode" style="max-width:260px;" placeholder="Admin passcode">
+        <button class="btn btn-ghost btn-sm" id="btnSaveAdminPass">Save</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================ PLAYERS ============================================================ -->
+  <section class="view" id="view-players">
+    <div class="grid cols-2">
+      <div class="card">
+        <h2>Import Players (CSV)</h2>
+        <p class="sub">Columns: <code>player_name, team, position, base_price, notes</code>. Only <code>player_name</code> is required.</p>
+        <input type="file" id="csvInput" accept=".csv,text/csv">
+        <div class="row" style="margin-top:10px;">
+          <button class="btn btn-ghost btn-sm" id="btnDownloadSample">Download sample CSV</button>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Add Player Manually</h2>
+        <form id="playerForm" class="grid cols-2">
+          <div class="field"><label>Player name *</label><input type="text" id="pName" required></div>
+          <div class="field"><label>Team / village</label><input type="text" id="pTeam"></div>
+          <div class="field"><label>Position</label><input type="text" id="pPosition" placeholder="Setter, Spiker..."></div>
+          <div class="field"><label>Base price</label><input type="number" id="pBase" min="0" value="0"></div>
+          <div class="field" style="grid-column:1/-1;"><label>Notes</label><input type="text" id="pNotes"></div>
+          <button type="submit" class="btn btn-navy" style="grid-column:1/-1;">+ Add Player</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Player Pool</h2>
+      <div class="search-bar">
+        <input type="text" id="playerSearch" placeholder="Search by name, team or position...">
+        <select id="playerStatusFilter">
+          <option value="all">All statuses</option>
+          <option value="available">Available</option>
+          <option value="sold">Sold</option>
+          <option value="unsold">Unsold</option>
+        </select>
+      </div>
+      <div style="overflow-x:auto;">
+        <table id="playerTable">
+          <thead><tr><th>Name</th><th>Team</th><th>Position</th><th>Base</th><th>Status</th><th>Notes</th><th></th></tr></thead>
+          <tbody id="playerTableBody"></tbody>
+        </table>
+      </div>
+      <div class="empty hidden" id="playersEmpty"><strong>No players yet</strong>Import a CSV or add players manually above.</div>
+    </div>
+  </section>
+
+  <!-- ============================================================ AUCTION ============================================================ -->
+  <section class="view" id="view-auction">
+
+    <div class="card" id="loginCard">
+      <h2>Sign in to this device</h2>
+      <p class="sub">Pick a role for this browser tab. Each tab/device remembers its own role.</p>
+      <div class="login-grid">
+        <div class="login-card">
+          <label>Sign in as</label>
+          <select id="loginRole">
+            <option value="admin">Admin / Auctioneer</option>
+            <option value="captain">Captain</option>
+          </select>
+          <div class="field" id="captainSelectWrap" style="margin-top:10px;">
+            <label>Captain</label>
+            <select id="loginCaptain"></select>
+          </div>
+          <div class="field" id="passcodeWrap" style="margin-top:10px;">
+            <label>Passcode</label>
+            <input type="text" id="loginPasscode" placeholder="If required">
+          </div>
+          <button class="btn btn-primary btn-block" id="btnLogin" style="margin-top:6px;">Sign In</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="adminPanel" class="hidden">
+      <div class="card">
+        <h2>Nominate a Player</h2>
+        <div class="row">
+          <select id="nominateSelect" style="flex:1; min-width:220px;"></select>
+          <button class="btn btn-primary" id="btnNominate">Start Bidding</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card scoreboard hidden" id="scoreboardCard">
+      <div class="sb-stamp hidden" id="sbStamp">SOLD</div>
+      <div class="sb-top">
+        <div>
+          <p class="sb-player-name" id="sbName">—</p>
+          <p class="sb-player-meta" id="sbMeta">—</p>
+        </div>
+        <div class="sb-timer">
+          <svg width="78" height="78" viewBox="0 0 78 78">
+            <circle class="ring-bg" cx="39" cy="39" r="33"></circle>
+            <circle class="ring-fg" id="ringFg" cx="39" cy="39" r="33" stroke-dasharray="207" stroke-dashoffset="0"></circle>
+          </svg>
+          <div class="sb-timer-num" id="sbTimerNum">--</div>
+        </div>
+      </div>
+      <div class="sb-mid">
+        <div>
+          <div class="sb-stat-label">Current Bid</div>
+          <div class="sb-bid-amount" id="sbBidAmount">—</div>
+        </div>
+        <div>
+          <div class="sb-stat-label">Highest Bidder</div>
+          <div class="sb-bidder-name" id="sbBidder">No bids yet</div>
+        </div>
+      </div>
+      <div class="sb-actions" id="sbActions"></div>
+    </div>
+
+    <div class="grid cols-2">
+      <div class="card">
+        <h2>Bid Activity</h2>
+        <div class="feed" id="bidFeed"><div class="empty">Bidding history will appear here.</div></div>
+      </div>
+      <div class="card" id="captainStatusCard">
+        <h2>Captain Status</h2>
+        <div id="captainStatusList"></div>
+      </div>
+    </div>
+
+    <div class="card" id="wishlistCard">
+      <h2>My Wishlist</h2>
+      <p class="sub">Tap the star next to any available player to shortlist them (visible only to you, on this device).</p>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead><tr><th></th><th>Name</th><th>Team</th><th>Base</th></tr></thead>
+          <tbody id="wishlistTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================ RESULTS ============================================================ -->
+  <section class="view" id="view-results">
+    <div class="grid cols-4" id="resultsKpis"></div>
+
+    <div class="card">
+      <h2>Sold Players</h2>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead><tr><th>Player</th><th>Team</th><th>Position</th><th>Sold To</th><th>Price</th></tr></thead>
+          <tbody id="soldTableBody"></tbody>
+        </table>
+      </div>
+      <div class="empty hidden" id="soldEmpty"><strong>No sales yet</strong>Sold players will show up here once the auction gets going.</div>
+    </div>
+
+    <div class="grid cols-2">
+      <div class="card">
+        <h2>Unsold Players</h2>
+        <table><thead><tr><th>Player</th><th>Team</th><th>Base</th></tr></thead><tbody id="unsoldTableBody"></tbody></table>
+      </div>
+      <div class="card">
+        <h2>Captain Budgets</h2>
+        <table><thead><tr><th>Captain</th><th>Spent</th><th>Remaining</th><th>Squad</th></tr></thead><tbody id="budgetTableBody"></tbody></table>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Export &amp; Reset</h2>
+      <div class="row">
+        <button class="btn btn-teal" id="btnExportJson">Export Full State (JSON)</button>
+        <button class="btn btn-teal" id="btnExportCsv">Export Results (CSV)</button>
+        <button class="btn btn-danger" id="btnReset">Reset Tournament</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================ HELP / README ============================================================ -->
+  <section class="view" id="view-help">
+    <div class="card">
+      <h2>How This App Works</h2>
+      <div class="helpbox">
+        <h3>1. Setup</h3>
+        This is a single HTML file — there is no server. Everything is saved in this browser's <code>localStorage</code>, so it survives page reloads on the same device. Start in the <b>Setup</b> tab: set your currency symbol, minimum bid increment, countdown duration, whether the timer or the admin decides when a player is sold, and add your captains with their budgets.
+
+        <h3>2. Players</h3>
+        Upload a CSV or add players by hand. Expected columns:
+        <pre>player_name,team,position,base_price,notes
+John Smith,Team A,Setter,100,Left-handed
+Alice Johnson,Team B,Outside Hitter,150,</pre>
+        Only <code>player_name</code> is required — everything else defaults sensibly if left out.
+
+        <h3>3. Running the Auction</h3>
+        On the <b>Live Auction</b> tab, sign in as <b>Admin</b> to nominate players and control the sale, or sign in as a <b>Captain</b> to place bids. The admin picks a player from the "available" list and clicks <b>Start Bidding</b>. Captains click <b>Place Bid</b> to bid the next valid amount (base price, then increments). Every new bid resets the countdown so nobody gets sniped unfairly. When the timer runs out (or the admin clicks <b>Sell</b>, depending on your close-mode setting), the player is assigned to the highest bidder and their budget is deducted automatically.
+
+        <h3>4. Multi-Device / Multi-Tab Play</h3>
+        This file only syncs automatically <b>between browser tabs on the same device</b> (via <code>localStorage</code> events) — for example, open one tab for the Admin and one tab per captain on a shared laptop, or hand a tablet around. It does <b>not</b> sync across separate phones/computers on its own, since there's no backend server.
+        <br><br>
+        <b>Want real multi-device sync?</b> The cleanest free option is Google's <b>Firebase Realtime Database</b> (or Firestore): create a free Firebase project, replace the <code>saveState()</code>/<code>loadState()</code> functions in this file's <code>&lt;script&gt;</code> with calls to the Firebase SDK (<code>set()</code>/<code>onValue()</code>), and every connected device will see live updates. Alternatively, a tiny WebSocket or Supabase backend works the same way — the important part is swapping the local persistence layer for a networked one while keeping the rest of the UI logic unchanged.
+
+        <h3>5. Results &amp; Export</h3>
+        The <b>Results</b> tab shows sold/unsold players and final captain budgets, and lets you export everything as JSON (full backup) or CSV (a simple results sheet). <b>Reset Tournament</b> wipes all saved data on this device — use it to start a fresh auction.
+
+        <h3>Hosting</h3>
+        Just open this file directly in a browser, or drag it onto Netlify / GitHub Pages / any static host. No build step, no dependencies, no server required.
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<div class="footer-note">RAVL Auction Room · runs entirely in your browser · no data leaves this device</div>
+
+<script>
+/* ============================================================================
+   RAVL AUCTION ROOM — application logic
+   Single-file, no dependencies. State lives in localStorage under STORAGE_KEY.
+   Role (admin / captain) lives in sessionStorage so each browser TAB can act
+   as a different participant on the same device.
+   ============================================================================ */
+
+const STORAGE_KEY = 'ravl_auction_state_v1';
+const BACKUP_KEY = 'ravl_auction_state_backup_v1';   // rolling "last known good" copy
+const ROLE_KEY = 'ravl_auction_role_v1';
+let lastSavedAt = null;
+let storageOK = true;
+
+/* ---------------------------- default state ---------------------------- */
+function defaultState(){
+  return {
+    settings:{
+      tournamentName:'RAVL Season 4',
+      currency:'₹',
+      increment:50,
+      timerSeconds:30,
+      defaultBudget:10000,
+      closeMode:'timer', // 'timer' | 'admin'
+      adminPasscode:''
+    },
+    captains:[],   // {id,name,passcode,budget,remaining}
+    players:[],    // {id,name,team,position,basePrice,notes,status,soldTo,soldPrice}
+    auction:{
+      currentPlayerId:null,
+      currentBid:0,
+      currentBidderId:null,
+      timerEnd:null,     // epoch ms
+      running:false,
+      lastResult:null    // {type:'sold'|'unsold', playerId, ...} shown briefly as a stamp
+    },
+    bidLog:[],      // {t, text}
+    wishlists:{}    // captainId -> [playerId,...]
+  };
+}
+
+let state = loadState();
+let session = loadSession();
+let activeTab = 'setup';
+let countdownHandle = null;
+
+/* ---------------------------- persistence ---------------------------- */
+// Fills in any fields missing from an older/partial save so the app never
+// crashes on a schema mismatch — it just fills gaps with fresh defaults.
+function normalizeState(parsed){
+  const d = defaultState();
+  return Object.assign(d, parsed, {
+    settings: Object.assign(d.settings, parsed.settings||{}),
+    auction: Object.assign(d.auction, parsed.auction||{}),
+    captains: Array.isArray(parsed.captains) ? parsed.captains : [],
+    players: Array.isArray(parsed.players) ? parsed.players : [],
+    bidLog: Array.isArray(parsed.bidLog) ? parsed.bidLog : [],
+    wishlists: parsed.wishlists && typeof parsed.wishlists==='object' ? parsed.wishlists : {}
+  });
+}
+
+function checkStorageAvailable(){
+  try{
+    const k = '__ravl_probe__';
+    localStorage.setItem(k, '1');
+    localStorage.removeItem(k);
+    return true;
+  }catch(e){
+    return false;
+  }
+}
+
+function loadState(){
+  storageOK = checkStorageAvailable();
+  if(!storageOK){
+    // Storage is blocked entirely (e.g. locked-down private browsing) —
+    // run in-memory only for this page view and warn loudly in the UI.
+    return defaultState();
+  }
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(!raw) return defaultState();
+    return normalizeState(JSON.parse(raw));
+  }catch(e){
+    console.error('Primary save was unreadable, trying automatic backup.', e);
+    try{
+      const backupRaw = localStorage.getItem(BACKUP_KEY);
+      if(backupRaw){
+        const recovered = normalizeState(JSON.parse(backupRaw));
+        setTimeout(()=> toast('Your last save was corrupted — recovered from the previous automatic backup instead.', 'error'), 300);
+        return recovered;
+      }
+    }catch(e2){
+      console.error('Backup was also unreadable.', e2);
+    }
+    setTimeout(()=> toast('Could not read any saved data on this device — starting a fresh tournament.', 'error'), 300);
+    return defaultState();
+  }
+}
+
+// Every save keeps the previous good copy as a backup first, so a save that
+// gets interrupted partway (closed tab, crash, storage full) can never wipe
+// out the last fully-written state — loadState() will fall back to it.
+function saveState(){
+  if(!storageOK){
+    toast('⚠ Not saved — this browser is blocking local storage.', 'error');
+    return;
+  }
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(raw) localStorage.setItem(BACKUP_KEY, raw);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    lastSavedAt = Date.now();
+    updateSaveIndicator();
+  }catch(e){
+    console.error('Save failed', e);
+    toast('⚠ Save failed — storage may be full. Export a backup from Results → Export now.', 'error');
+  }
+}
+
+function updateSaveIndicator(){
+  const el = document.getElementById('saveIndicator');
+  if(!el) return;
+  if(!storageOK){ el.textContent = 'Storage blocked — nothing is being saved'; return; }
+  if(!lastSavedAt){ el.textContent = 'Not saved yet'; return; }
+  const secs = Math.max(0, Math.round((Date.now()-lastSavedAt)/1000));
+  el.textContent = secs < 3 ? 'Saved locally · just now' : `Saved locally · ${secs}s ago`;
+}
+setInterval(updateSaveIndicator, 1000);
+function loadSession(){
+  try{
+    const raw = sessionStorage.getItem(ROLE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  }catch(e){ return null; }
+}
+function saveSession(){
+  if(session) sessionStorage.setItem(ROLE_KEY, JSON.stringify(session));
+  else sessionStorage.removeItem(ROLE_KEY);
+}
+
+// Sync across tabs on the same device/browser
+window.addEventListener('storage', (e)=>{
+  if(e.key === STORAGE_KEY){
+    state = loadState();
+    renderAll();
+  }
+});
+
+/* ---------------------------- helpers ---------------------------- */
+function uid(prefix){ return prefix + '_' + Math.random().toString(36).slice(2,10); }
+function fmtMoney(n){ return state.settings.currency + Number(n||0).toLocaleString('en-IN'); }
+function findPlayer(id){ return state.players.find(p=>p.id===id); }
+function findCaptain(id){ return state.captains.find(c=>c.id===id); }
+function escapeHtml(str){
+  return String(str==null?'':str).replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+function toast(msg, type){
+  const wrap = document.getElementById('toastWrap');
+  const el = document.createElement('div');
+  el.className = 'toast' + (type ? ' '+type : '');
+  el.textContent = msg;
+  wrap.appendChild(el);
+  setTimeout(()=>{ el.remove(); }, 3200);
+}
+
+/* ============================================================
+   TAB NAVIGATION
+   ============================================================ */
+document.getElementById('tabNav').addEventListener('click', (e)=>{
+  const btn = e.target.closest('.tab-btn');
+  if(!btn) return;
+  switchTab(btn.dataset.tab);
+});
+function switchTab(tab){
+  activeTab = tab;
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active', b.dataset.tab===tab));
+  document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active', v.id==='view-'+tab));
+  renderAll();
+}
+
+/* ============================================================
+   SETUP TAB
+   ============================================================ */
+function renderSetup(){
+  const s = state.settings;
+  document.getElementById('setTournamentName').value = s.tournamentName;
+  document.getElementById('setCurrency').value = s.currency;
+  document.getElementById('setIncrement').value = s.increment;
+  document.getElementById('setTimer').value = s.timerSeconds;
+  document.getElementById('setDefaultBudget').value = s.defaultBudget;
+  document.getElementById('setCloseMode').value = s.closeMode;
+  document.getElementById('setAdminPasscode').value = s.adminPasscode;
+  document.getElementById('tournamentTagline').textContent = (s.tournamentName || 'RAVL').toUpperCase() + ' · LIVE BIDDING BOARD';
+
+  const list = document.getElementById('captainList');
+  if(state.captains.length===0){
+    list.innerHTML = '<div class="empty"><strong>No captains yet</strong>Add captains using the form below.</div>';
+  }else{
+    list.innerHTML = state.captains.map(c=>`
+      <div class="captain-chip">
+        <div>
+          <div class="name">${escapeHtml(c.name)}</div>
+          <div class="meta">${fmtMoney(c.budget)} budget ${c.passcode ? '· 🔒 locked' : ''}</div>
+        </div>
+        <button class="btn btn-ghost btn-sm" data-remove-captain="${c.id}">Remove</button>
+      </div>
+    `).join('');
+  }
+}
+
+document.getElementById('btnSaveSettings').addEventListener('click', ()=>{
+  state.settings.tournamentName = document.getElementById('setTournamentName').value.trim() || 'RAVL Season 4';
+  state.settings.currency = document.getElementById('setCurrency').value.trim() || '₹';
+  state.settings.increment = Math.max(1, Number(document.getElementById('setIncrement').value) || 50);
+  state.settings.timerSeconds = Math.max(5, Number(document.getElementById('setTimer').value) || 30);
+  state.settings.defaultBudget = Math.max(0, Number(document.getElementById('setDefaultBudget').value) || 0);
+  state.settings.closeMode = document.getElementById('setCloseMode').value;
+  saveState();
+  toast('Settings saved', 'success');
+  renderAll();
+});
+
+document.getElementById('btnSaveAdminPass').addEventListener('click', ()=>{
+  state.settings.adminPasscode = document.getElementById('setAdminPasscode').value.trim();
+  saveState();
+  toast('Admin passcode saved', 'success');
+});
+
+document.getElementById('captainForm').addEventListener('submit', (e)=>{
+  e.preventDefault();
+  const name = document.getElementById('capName').value.trim();
+  if(!name){ return; }
+  if(state.captains.some(c=>c.name.toLowerCase()===name.toLowerCase())){
+    toast('A captain with that name already exists', 'error');
+    return;
+  }
+  const passcode = document.getElementById('capPasscode').value.trim();
+  const budgetInput = document.getElementById('capBudget').value;
+  const budget = budgetInput === '' ? state.settings.defaultBudget : Math.max(0, Number(budgetInput));
+  state.captains.push({ id:uid('cap'), name, passcode, budget, remaining:budget });
+  saveState();
+  e.target.reset();
+  toast('Captain added', 'success');
+  renderAll();
+});
+
+document.getElementById('captainList').addEventListener('click', (e)=>{
+  const id = e.target.dataset.removeCaptain;
+  if(!id) return;
+  if(state.auction.currentPlayerId && state.auction.currentBidderId===id){
+    toast('Cannot remove a captain who is currently the highest bidder', 'error');
+    return;
+  }
+  if(!confirm('Remove this captain? This cannot be undone.')) return;
+  state.captains = state.captains.filter(c=>c.id!==id);
+  saveState();
+  renderAll();
+});
+
+/* ============================================================
+   PLAYERS TAB — CSV import, manual add, search/filter, remove
+   ============================================================ */
+function parseCsv(text){
+  // Minimal RFC4180-ish CSV parser: handles quoted fields with embedded commas.
+  const rows = [];
+  let row = [], field = '', inQuotes = false;
+  for(let i=0;i<text.length;i++){
+    const c = text[i];
+    if(inQuotes){
+      if(c === '"'){
+        if(text[i+1] === '"'){ field += '"'; i++; }
+        else{ inQuotes = false; }
+      } else field += c;
+    } else {
+      if(c === '"') inQuotes = true;
+      else if(c === ','){ row.push(field); field=''; }
+      else if(c === '\n'){ row.push(field); rows.push(row); row=[]; field=''; }
+      else if(c === '\r'){ /* skip */ }
+      else field += c;
+    }
+  }
+  if(field.length || row.length){ row.push(field); rows.push(row); }
+  return rows.filter(r => r.some(f=>f.trim()!==''));
+}
+
+document.getElementById('csvInput').addEventListener('change', (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev)=>{
+    try{
+      const rows = parseCsv(ev.target.result);
+      if(rows.length < 2){ toast('CSV appears to be empty', 'error'); return; }
+      const header = rows[0].map(h=>h.trim().toLowerCase());
+      const idx = {
+        name: header.indexOf('player_name') >=0 ? header.indexOf('player_name') : header.indexOf('name'),
+        team: header.indexOf('team'),
+        position: header.indexOf('position'),
+        base: header.indexOf('base_price'),
+        notes: header.indexOf('notes')
+      };
+      if(idx.name < 0){ toast('CSV must include a player_name column', 'error'); return; }
+      let added = 0;
+      for(let i=1;i<rows.length;i++){
+        const r = rows[i];
+        const name = (r[idx.name]||'').trim();
+        if(!name) continue;
+        state.players.push({
+          id: uid('p'),
+          name,
+          team: idx.team>=0 ? (r[idx.team]||'').trim() : '',
+          position: idx.position>=0 ? (r[idx.position]||'').trim() : '',
+          basePrice: idx.base>=0 ? (Number(r[idx.base]) || 0) : 0,
+          notes: idx.notes>=0 ? (r[idx.notes]||'').trim() : '',
+          status:'available', soldTo:null, soldPrice:null
+        });
+        added++;
+      }
+      saveState();
+      toast(`Imported ${added} player(s)`, 'success');
+      renderAll();
+    }catch(err){
+      console.error(err);
+      toast('Could not parse that CSV file', 'error');
+    }
+    e.target.value = '';
+  };
+  reader.readAsText(file);
+});
+
+document.getElementById('btnDownloadSample').addEventListener('click', ()=>{
+  const sample = 'player_name,team,position,base_price,notes\nJohn Smith,Team A,Setter,100,Left-handed\nAlice Johnson,Team B,Outside Hitter,150,\n';
+  downloadFile('sample_players.csv', sample, 'text/csv');
+});
+
+document.getElementById('playerForm').addEventListener('submit', (e)=>{
+  e.preventDefault();
+  const name = document.getElementById('pName').value.trim();
+  if(!name) return;
+  state.players.push({
+    id: uid('p'),
+    name,
+    team: document.getElementById('pTeam').value.trim(),
+    position: document.getElementById('pPosition').value.trim(),
+    basePrice: Math.max(0, Number(document.getElementById('pBase').value) || 0),
+    notes: document.getElementById('pNotes').value.trim(),
+    status:'available', soldTo:null, soldPrice:null
+  });
+  saveState();
+  e.target.reset();
+  toast('Player added', 'success');
+  renderAll();
+});
+
+document.getElementById('playerSearch').addEventListener('input', renderPlayers);
+document.getElementById('playerStatusFilter').addEventListener('change', renderPlayers);
+
+function renderPlayers(){
+  document.getElementById('countPlayers').textContent = state.players.length;
+  const search = (document.getElementById('playerSearch').value||'').toLowerCase();
+  const statusFilter = document.getElementById('playerStatusFilter').value;
+  const rows = state.players.filter(p=>{
+    if(statusFilter!=='all' && p.status!==statusFilter) return false;
+    if(!search) return true;
+    return (p.name+' '+p.team+' '+p.position).toLowerCase().includes(search);
+  });
+  const tbody = document.getElementById('playerTableBody');
+  document.getElementById('playersEmpty').classList.toggle('hidden', state.players.length>0);
+  tbody.innerHTML = rows.map(p=>{
+    const captain = p.soldTo ? findCaptain(p.soldTo) : null;
+    const badgeClass = p.status==='sold' ? 'badge-sold' : (p.status==='unsold' ? 'badge-unsold' : 'badge-available');
+    const statusLabel = p.status==='sold' ? `Sold${captain? ' · '+escapeHtml(captain.name):''}` : (p.status==='unsold'?'Unsold':'Available');
+    const canRemove = p.status==='available' && state.auction.currentPlayerId !== p.id;
+    return `<tr>
+      <td>${escapeHtml(p.name)}</td>
+      <td>${escapeHtml(p.team)}</td>
+      <td>${escapeHtml(p.position)}</td>
+      <td>${fmtMoney(p.basePrice)}</td>
+      <td><span class="badge ${badgeClass}">${statusLabel}</span></td>
+      <td>${escapeHtml(p.notes)}</td>
+      <td>${canRemove ? `<button class="btn btn-ghost btn-sm" data-remove-player="${p.id}">Remove</button>` : ''}</td>
+    </tr>`;
+  }).join('');
+}
+
+document.getElementById('playerTableBody').addEventListener('click', (e)=>{
+  const id = e.target.dataset.removePlayer;
+  if(!id) return;
+  if(!confirm('Remove this player from the pool?')) return;
+  state.players = state.players.filter(p=>p.id!==id);
+  saveState();
+  renderAll();
+});
+
+/* ============================================================
+   AUCTION TAB — login, nominate, bid, sell, timer
+   ============================================================ */
+document.getElementById('loginRole').addEventListener('change', updateLoginFormVisibility);
+function updateLoginFormVisibility(){
+  const role = document.getElementById('loginRole').value;
+  document.getElementById('captainSelectWrap').classList.toggle('hidden', role!=='captain');
+  const captainSel = document.getElementById('loginCaptain');
+  captainSel.innerHTML = state.captains.map(c=>`<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
+  const needsPasscode = role==='admin' ? !!state.settings.adminPasscode
+    : (captainSel.value && findCaptain(captainSel.value) ? !!findCaptain(captainSel.value).passcode : true);
+  document.getElementById('passcodeWrap').classList.toggle('hidden', role==='admin' ? !state.settings.adminPasscode : false);
+}
+document.getElementById('loginCaptain').addEventListener('change', updateLoginFormVisibility);
+
+document.getElementById('btnLogin').addEventListener('click', ()=>{
+  const role = document.getElementById('loginRole').value;
+  const passcode = document.getElementById('loginPasscode').value;
+  if(role==='admin'){
+    if(state.settings.adminPasscode && state.settings.adminPasscode !== passcode){
+      toast('Incorrect admin passcode', 'error'); return;
+    }
+    session = { type:'admin', name:'Admin' };
+  } else {
+    if(state.captains.length===0){ toast('No captains have been added yet', 'error'); return; }
+    const capId = document.getElementById('loginCaptain').value;
+    const captain = findCaptain(capId);
+    if(!captain){ toast('Select a captain', 'error'); return; }
+    if(captain.passcode && captain.passcode !== passcode){
+      toast('Incorrect passcode', 'error'); return;
+    }
+    session = { type:'captain', id: captain.id, name: captain.name };
+  }
+  saveSession();
+  toast('Signed in as ' + session.name, 'success');
+  renderAll();
+});
+
+function signOut(){
+  session = null;
+  saveSession();
+  renderAll();
+}
+
+function renderRoleBadge(){
+  const el = document.getElementById('roleBadge');
+  if(!session){
+    el.innerHTML = 'Not signed in';
+    return;
+  }
+  const label = session.type==='admin' ? 'Admin' : 'Captain · ' + escapeHtml(session.name);
+  el.innerHTML = `${label} <button id="btnSignOut">Sign out</button>`;
+  document.getElementById('btnSignOut').addEventListener('click', signOut);
+}
+
+function renderAuction(){
+  const loginCard = document.getElementById('loginCard');
+  const adminPanel = document.getElementById('adminPanel');
+  const wishlistCard = document.getElementById('wishlistCard');
+  loginCard.classList.toggle('hidden', !!session);
+  adminPanel.classList.toggle('hidden', !(session && session.type==='admin'));
+  wishlistCard.classList.toggle('hidden', !(session && session.type==='captain'));
+
+  if(session && session.type==='captain'){
+    // refresh passcode requirement hint isn't needed post-login
+  }
+  updateLoginFormVisibility();
+
+  // Nominate dropdown (admin)
+  const available = state.players.filter(p=>p.status==='available');
+  const nomSel = document.getElementById('nominateSelect');
+  nomSel.innerHTML = available.length
+    ? available.map(p=>`<option value="${p.id}">${escapeHtml(p.name)} ${p.team? '('+escapeHtml(p.team)+')':''} — base ${fmtMoney(p.basePrice)}</option>`).join('')
+    : '<option value="">No available players left</option>';
+  document.getElementById('btnNominate').disabled = available.length===0 || !!state.auction.currentPlayerId;
+
+  renderScoreboard();
+  renderBidFeed();
+  renderCaptainStatus();
+  renderWishlist();
+}
+
+document.getElementById('btnNominate').addEventListener('click', ()=>{
+  const playerId = document.getElementById('nominateSelect').value;
+  if(!playerId) return;
+  if(state.auction.currentPlayerId){ toast('A player is already up for bidding', 'error'); return; }
+  const player = findPlayer(playerId);
+  if(!player || player.status!=='available') return;
+
+  state.auction.currentPlayerId = playerId;
+  state.auction.currentBid = 0;
+  state.auction.currentBidderId = null;
+  state.auction.running = true;
+  state.auction.timerEnd = Date.now() + state.settings.timerSeconds*1000;
+  state.auction.lastResult = null;
+  logBid(`${player.name} nominated — starting price ${fmtMoney(player.basePrice)}`);
+  saveState();
+  renderAll();
+  startCountdownWatcher();
+});
+
+function nextBidAmount(){
+  const a = state.auction;
+  if(a.currentBidderId === null){
+    const player = findPlayer(a.currentPlayerId);
+    return player ? (player.basePrice || state.settings.increment) : state.settings.increment;
+  }
+  return a.currentBid + state.settings.increment;
+}
+
+function placeBid(captainId){
+  const a = state.auction;
+  const player = findPlayer(a.currentPlayerId);
+  const captain = findCaptain(captainId);
+  if(!player || !captain) return;
+  const amount = nextBidAmount();
+  if(amount > captain.remaining){
+    toast('Not enough budget remaining for that bid', 'error');
+    return;
+  }
+  a.currentBid = amount;
+  a.currentBidderId = captainId;
+  a.timerEnd = Date.now() + state.settings.timerSeconds*1000; // reset countdown on every bid
+  logBid(`${captain.name} bids ${fmtMoney(amount)} for ${player.name}`);
+  saveState();
+  renderAll();
+}
+
+function finalizeSale(sold){
+  const a = state.auction;
+  const player = findPlayer(a.currentPlayerId);
+  if(!player) return;
+
+  if(sold && a.currentBidderId){
+    const captain = findCaptain(a.currentBidderId);
+    player.status = 'sold';
+    player.soldTo = captain.id;
+    player.soldPrice = a.currentBid;
+    captain.remaining = captain.remaining - a.currentBid;
+    logBid(`SOLD: ${player.name} → ${captain.name} for ${fmtMoney(a.currentBid)}`);
+    a.lastResult = { type:'sold', playerName:player.name };
+  } else {
+    player.status = 'unsold';
+    logBid(`UNSOLD: ${player.name} (no bids)`);
+    a.lastResult = { type:'unsold', playerName:player.name };
+  }
+  a.currentPlayerId = null;
+  a.currentBid = 0;
+  a.currentBidderId = null;
+  a.timerEnd = null;
+  a.running = false;
+  saveState();
+  renderAll();
+  // clear the SOLD/UNSOLD stamp after a moment
+  setTimeout(()=>{ a.lastResult = null; saveState(); renderAll(); }, 2600);
+}
+
+function logBid(text){
+  state.bidLog.unshift({ t: new Date().toLocaleTimeString(), text });
+  state.bidLog = state.bidLog.slice(0, 200);
+}
+
+/* ---- countdown ---- */
+function startCountdownWatcher(){
+  if(countdownHandle) clearInterval(countdownHandle);
+  countdownHandle = setInterval(()=>{
+    const a = state.auction;
+    if(!a.currentPlayerId || !a.timerEnd){ return; }
+    const remaining = a.timerEnd - Date.now();
+    if(remaining <= 0){
+      if(state.settings.closeMode === 'timer'){
+        finalizeSale(!!a.currentBidderId);
+      } else {
+        // admin-close mode: freeze display at 0, admin must act manually
+        renderScoreboardTimerOnly();
+      }
+    } else {
+      renderScoreboardTimerOnly();
+    }
+  }, 250);
+}
+startCountdownWatcher();
+
+function renderScoreboardTimerOnly(){
+  const a = state.auction;
+  if(!a.currentPlayerId || activeTab!=='auction') return;
+  const remaining = Math.max(0, a.timerEnd - Date.now());
+  const secs = Math.ceil(remaining/1000);
+  const total = state.settings.timerSeconds;
+  const circumference = 207; // 2*pi*33 rounded
+  const ratio = Math.max(0, Math.min(1, remaining/(total*1000)));
+  const ring = document.getElementById('ringFg');
+  if(ring){
+    ring.setAttribute('stroke-dashoffset', String(circumference * (1-ratio)));
+    ring.classList.toggle('low', secs<=10);
+  }
+  const numEl = document.getElementById('sbTimerNum');
+  if(numEl) numEl.textContent = secs;
+}
+
+function renderScoreboard(){
+  const a = state.auction;
+  const card = document.getElementById('scoreboardCard');
+  const player = a.currentPlayerId ? findPlayer(a.currentPlayerId) : null;
+
+  if(!player && !a.lastResult){
+    card.classList.add('hidden');
+    return;
+  }
+  card.classList.remove('hidden');
+
+  const stamp = document.getElementById('sbStamp');
+  if(a.lastResult){
+    stamp.textContent = a.lastResult.type==='sold' ? 'SOLD' : 'UNSOLD';
+    stamp.classList.remove('hidden');
+    stamp.classList.toggle('unsold', a.lastResult.type==='unsold');
+  } else {
+    stamp.classList.add('hidden');
+  }
+
+  if(!player){
+    document.getElementById('sbName').textContent = a.lastResult ? a.lastResult.playerName : '—';
+    document.getElementById('sbMeta').textContent = '';
+    document.getElementById('sbBidAmount').textContent = '—';
+    document.getElementById('sbBidder').textContent = '—';
+    document.getElementById('sbTimerNum').textContent = '--';
+    document.getElementById('sbActions').innerHTML = '';
+    return;
+  }
+
+  document.getElementById('sbName').textContent = player.name;
+  document.getElementById('sbMeta').textContent = [player.team, player.position].filter(Boolean).join(' · ') || 'No team / position listed';
+  document.getElementById('sbBidAmount').textContent = a.currentBidderId ? fmtMoney(a.currentBid) : 'Starting ' + fmtMoney(player.basePrice);
+  document.getElementById('sbBidder').textContent = a.currentBidderId ? findCaptain(a.currentBidderId).name : 'No bids yet';
+  renderScoreboardTimerOnly();
+
+  // Actions differ by role
+  const actions = document.getElementById('sbActions');
+  let html = '';
+  if(session && session.type==='captain'){
+    const captain = findCaptain(session.id);
+    const amount = nextBidAmount();
+    const isHighest = a.currentBidderId === captain.id;
+    const canAfford = amount <= captain.remaining;
+    html += `<button class="btn btn-gold" id="btnPlaceBid" ${(!canAfford||isHighest)?'disabled':''}>
+      ${isHighest ? "You're winning" : 'Place Bid · ' + fmtMoney(amount)}
+    </button>`;
+    if(!canAfford && !isHighest) html += `<span style="align-self:center;font-family:var(--font-mono);font-size:12px;color:var(--red);">Insufficient budget</span>`;
+  }
+  if(session && session.type==='admin'){
+    html += `<button class="btn btn-primary" id="btnSellNow">Sell to ${a.currentBidderId ? escapeHtml(findCaptain(a.currentBidderId).name) : 'highest bidder'}</button>`;
+    html += `<button class="btn btn-ghost" id="btnMarkUnsold">Mark Unsold</button>`;
+  }
+  actions.innerHTML = html;
+
+  const bidBtn = document.getElementById('btnPlaceBid');
+  if(bidBtn) bidBtn.addEventListener('click', ()=> placeBid(session.id));
+  const sellBtn = document.getElementById('btnSellNow');
+  if(sellBtn) sellBtn.addEventListener('click', ()=>{
+    if(!a.currentBidderId){ toast('No bids placed yet — mark unsold instead', 'error'); return; }
+    finalizeSale(true);
+  });
+  const unsoldBtn = document.getElementById('btnMarkUnsold');
+  if(unsoldBtn) unsoldBtn.addEventListener('click', ()=> finalizeSale(false));
+}
+
+function renderBidFeed(){
+  const el = document.getElementById('bidFeed');
+  if(state.bidLog.length===0){
+    el.innerHTML = '<div class="empty">Bidding history will appear here.</div>';
+    return;
+  }
+  el.innerHTML = state.bidLog.map(item=>`<div class="feed-item"><span class="t">${item.t}</span>${escapeHtml(item.text)}</div>`).join('');
+}
+
+function renderCaptainStatus(){
+  const el = document.getElementById('captainStatusList');
+  if(state.captains.length===0){
+    el.innerHTML = '<div class="empty">Add captains in the Setup tab.</div>';
+    return;
+  }
+  el.innerHTML = state.captains.map(c=>{
+    const squadCount = state.players.filter(p=>p.soldTo===c.id).length;
+    const isHighest = state.auction.currentBidderId===c.id;
+    return `<div class="captain-chip" style="${isHighest?'border-color:var(--gold); background:#FFF8E8;':''}">
+      <div>
+        <div class="name">${escapeHtml(c.name)} ${isHighest?'⭐':''}</div>
+        <div class="meta">${squadCount} player(s) signed</div>
+      </div>
+      <div class="meta">${fmtMoney(c.remaining)} left</div>
+    </div>`;
+  }).join('');
+}
+
+function renderWishlist(){
+  const tbody = document.getElementById('wishlistTableBody');
+  if(!session || session.type!=='captain'){ tbody.innerHTML=''; return; }
+  const mine = state.wishlists[session.id] || [];
+  const available = state.players.filter(p=>p.status==='available');
+  if(available.length===0){
+    tbody.innerHTML = '<tr><td colspan="4" class="empty">No available players right now.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = available.map(p=>{
+    const active = mine.includes(p.id);
+    return `<tr>
+      <td><span class="wishlist-star ${active?'active':''}" data-wishlist-toggle="${p.id}">★</span></td>
+      <td>${escapeHtml(p.name)}</td>
+      <td>${escapeHtml(p.team)}</td>
+      <td>${fmtMoney(p.basePrice)}</td>
+    </tr>`;
+  }).join('');
+}
+
+document.getElementById('wishlistTableBody').addEventListener('click', (e)=>{
+  const id = e.target.dataset.wishlistToggle;
+  if(!id || !session || session.type!=='captain') return;
+  const list = state.wishlists[session.id] || [];
+  state.wishlists[session.id] = list.includes(id) ? list.filter(x=>x!==id) : [...list, id];
+  saveState();
+  renderWishlist();
+});
+
+/* ============================================================
+   RESULTS TAB
+   ============================================================ */
+function renderResults(){
+  const sold = state.players.filter(p=>p.status==='sold');
+  const unsold = state.players.filter(p=>p.status==='unsold');
+  const available = state.players.filter(p=>p.status==='available');
+
+  document.getElementById('resultsKpis').innerHTML = `
+    <div class="kpi"><div class="num">${state.players.length}</div><div class="lbl">Total Players</div></div>
+    <div class="kpi"><div class="num">${sold.length}</div><div class="lbl">Sold</div></div>
+    <div class="kpi"><div class="num">${unsold.length}</div><div class="lbl">Unsold</div></div>
+    <div class="kpi"><div class="num">${available.length}</div><div class="lbl">Remaining</div></div>
+  `;
+
+  const soldBody = document.getElementById('soldTableBody');
+  document.getElementById('soldEmpty').classList.toggle('hidden', sold.length>0);
+  soldBody.innerHTML = sold.map(p=>{
+    const c = findCaptain(p.soldTo);
+    return `<tr><td>${escapeHtml(p.name)}</td><td>${escapeHtml(p.team)}</td><td>${escapeHtml(p.position)}</td><td>${c?escapeHtml(c.name):'—'}</td><td>${fmtMoney(p.soldPrice)}</td></tr>`;
+  }).join('');
+
+  document.getElementById('unsoldTableBody').innerHTML = unsold.length
+    ? unsold.map(p=>`<tr><td>${escapeHtml(p.name)}</td><td>${escapeHtml(p.team)}</td><td>${fmtMoney(p.basePrice)}</td></tr>`).join('')
+    : '<tr><td colspan="3" class="empty">No unsold players.</td></tr>';
+
+  document.getElementById('budgetTableBody').innerHTML = state.captains.length
+    ? state.captains.map(c=>{
+        const spent = c.budget - c.remaining;
+        const squad = state.players.filter(p=>p.soldTo===c.id).length;
+        return `<tr><td>${escapeHtml(c.name)}</td><td>${fmtMoney(spent)}</td><td>${fmtMoney(c.remaining)}</td><td>${squad}</td></tr>`;
+      }).join('')
+    : '<tr><td colspan="4" class="empty">No captains added.</td></tr>';
+}
+
+function downloadFile(filename, content, mime){
+  const blob = new Blob([content], {type: mime});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+
+document.getElementById('btnExportJson').addEventListener('click', ()=>{
+  downloadFile('ravl_auction_state.json', JSON.stringify(state, null, 2), 'application/json');
+});
+
+document.getElementById('btnExportCsv').addEventListener('click', ()=>{
+  const rows = [['player_name','team','position','base_price','status','sold_price','captain']];
+  state.players.forEach(p=>{
+    const c = p.soldTo ? findCaptain(p.soldTo) : null;
+    rows.push([p.name, p.team, p.position, p.basePrice, p.status, p.soldPrice||'', c?c.name:'']);
+  });
+  rows.push([]);
+  rows.push(['captain','budget','spent','remaining']);
+  state.captains.forEach(c=> rows.push([c.name, c.budget, c.budget-c.remaining, c.remaining]));
+  const csv = rows.map(r=> r.map(f=>{
+    const s = String(f==null?'':f);
+    return /[",\n]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s;
+  }).join(',')).join('\n');
+  downloadFile('ravl_auction_results.csv', csv, 'text/csv');
+});
+
+document.getElementById('btnReset').addEventListener('click', ()=>{
+  if(!confirm('This will permanently erase all players, captains, budgets and auction history on this device. Continue?')) return;
+  if(!confirm('Are you absolutely sure? This cannot be undone.')) return;
+  localStorage.removeItem(STORAGE_KEY);
+  sessionStorage.removeItem(ROLE_KEY);
+  state = defaultState();
+  session = null;
+  toast('Tournament reset', 'success');
+  renderAll();
+});
+
+/* ============================================================
+   GLOBAL RENDER
+   ============================================================ */
+function renderAll(){
+  renderRoleBadge();
+  renderSetup();
+  renderPlayers();
+  renderAuction();
+  renderResults();
+}
+
+// initial paint
+document.getElementById('storageWarning').style.display = storageOK ? 'none' : 'block';
+switchTab('setup');
+renderAll();
+updateLoginFormVisibility();
+updateSaveIndicator();
+
+// Resume notice — if a save already existed on load and an auction was
+// mid-flight, tell the user exactly what was picked back up so nothing
+// feels lost after a refresh, crash, or reopened tab.
+(function announceResume(){
+  if(!storageOK) return;
+  const hadSave = !!localStorage.getItem(STORAGE_KEY);
+  if(!hadSave) return;
+  const a = state.auction;
+  if(a.currentPlayerId){
+    const player = findPlayer(a.currentPlayerId);
+    const bidder = a.currentBidderId ? findCaptain(a.currentBidderId) : null;
+    const secsLeft = a.timerEnd ? Math.max(0, Math.round((a.timerEnd - Date.now())/1000)) : 0;
+    if(player){
+      toast(`Resumed: ${player.name} is still up for bidding${bidder ? ' — ' + fmtMoney(a.currentBid) + ' by ' + bidder.name : ''} (${secsLeft}s left).`, 'success');
+    }
+  } else if(state.players.length || state.captains.length){
+    toast(`Resumed saved tournament: ${state.players.filter(p=>p.status==='sold').length} sold, ${state.players.filter(p=>p.status==='available').length} remaining.`, 'success');
+  }
+})();
+</script>
+</body>
+</html>
