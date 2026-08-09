@@ -6,11 +6,17 @@ player pool from CSV, then runs the auction while captains bid live from their
 own phones. Because the state lives in a real SQLite database, **every device
 stays in sync automatically** — no localStorage tricks, no refreshing needed.
 
+Highlights: rebid unsold players with a permanent unsold counter, a **public
+no-login viewer screen** (`/view`) for a projector/TV, captain "My Team" panels,
+and an **exact-equal team distribution** (remainder stays undistributed) with
+manual admin overrides.
+
 ```
 auction_volleyball/
 ├── app.py              # Flask server + all API endpoints + SQLite schema
 ├── templates/
-│   └── index.html      # Mobile-friendly UI (all CSS/JS inline)
+│   ├── index.html      # Mobile-friendly admin/captain UI (all CSS/JS inline)
+│   └── viewer.html     # Public no-login live viewer screen (/view)
 ├── requirements.txt    # Flask
 ├── ravl_free_pool.csv  # Ready-made sample player list (42 players)
 └── ravl-auction.html   # Original single-file version (kept as reference)
@@ -116,30 +122,63 @@ WantedBy=multi-user.target
    on the server. Every bid resets the countdown. On timer expiry (or admin
    **Sell**), the player goes to the winning captain and their budget is
    deducted. Captains can also star players into a personal wishlist.
+
+   **Rebidding unsold players** — players marked *Unsold* are never lost. The
+   admin can nominate them again: they appear in the nominate dropdown tagged
+   `⚠ unsold ×N`, and the Results tab has a **Rebid** button per unsold player
+   that jumps to the auction tab and pre-selects them. Every player tracks how
+   many times they went unsold (`unsold_count`), shown in the players list,
+   results tables, dropdowns, bid feed and the CSV export — history is kept
+   even after they are finally sold.
+
+   **My Team (captains)** — each captain sees a live **My Team** panel: their
+   roster (players won + price paid), remaining budget, and a counter of how
+   many players are still left to be auctioned.
+
 5. **Results tab** (admin only) — sold / unsold players, final budgets, and
    CSV / JSON export. **Reset Tournament** wipes everything for a fresh start.
+
+6. **Public viewer screen** — `/view` (e.g. `https://your-server/view`) is a
+   no-login big-screen dashboard. It shows the live scoreboard (current player,
+   highest bid, countdown), sold/unsold/remaining counters, and team rosters
+   that update in real time. From the Live Auction tab the admin can toggle the
+   viewer between the **live board** and a **Final Teams** display (full
+   rosters + spent/left budget per captain).
+
+7. **Equal team distribution** — once every captain's budget is exhausted, the
+   admin can click **🎲 Distribute remaining players equally**. Every captain is
+   filled up to the exact same squad size (`total players ÷ captains`); any
+   remainder stays undistributed in the pool instead of pushing one team over
+   the target (41 players ÷ 4 captains = exactly 10 each, 1 left over). On the
+   Results tab the admin can also **manually assign** any leftover player to a
+   chosen captain, and **return** a distributed (₹0) player to the pool to
+   rebalance. Auction purchases are never changed — only leftover players.
 
 ## 4. API summary
 
 | Method | Path                 | Role    | Purpose                                   |
 |--------|----------------------|---------|-------------------------------------------|
 | GET    | `/`                  | —       | The app UI                                |
+| GET    | `/view`              | —       | Public no-login live viewer screen        |
 | GET    | `/api/state`         | any     | Full state snapshot (polled every 1.5 s)  |
 | POST   | `/api/login`         | —       | Sign in as admin or captain               |
 | POST   | `/api/logout`        | any     | Sign out                                  |
-| POST   | `/api/settings`      | admin   | Save tournament rules + admin passcode    |
+| POST   | `/api/settings`      | admin   | Save rules, admin passcode, viewer mode   |
 | POST   | `/api/captains`      | admin   | Add a captain                             |
 | DELETE | `/api/captains/<id>` | admin   | Remove a captain                          |
 | POST   | `/api/players`       | admin   | Add a player manually                     |
 | DELETE | `/api/players/<id>`  | admin   | Remove a player                           |
 | POST   | `/api/import`        | admin   | Upload CSV (multipart `file`)             |
-| POST   | `/api/nominate`      | admin   | Nominate a player (`player_id`) or random |
+| POST   | `/api/nominate`      | admin   | Nominate a player (`player_id`, incl. unsold rebid) or random |
 | POST   | `/api/bid`           | captain | Place the next valid bid                  |
 | POST   | `/api/sell`          | admin   | Sell / mark unsold (`sold` true|false)    |
 | POST   | `/api/cancel`        | admin   | Abort current round, player stays free    |
 | POST   | `/api/wishlist`      | captain | Toggle a player on/off the wishlist       |
+| POST   | `/api/distribute_remaining` | admin | Balanced random distribution (exact per-team count) |
+| POST   | `/api/assign_player` | admin   | Manually assign a leftover player to a captain |
+| POST   | `/api/unassign_player` | admin  | Return a distributed (₹0) player to the pool |
 | POST   | `/api/reset`         | admin   | Wipe the tournament                       |
-| GET    | `/api/export.csv`    | admin   | Download results as CSV                   |
+| GET    | `/api/export.csv`    | admin   | Download results as CSV (incl. `unsold_count`) |
 | GET    | `/api/export.json`   | admin   | Download full state as JSON               |
 
 ## 5. Notes & assumptions
@@ -153,7 +192,12 @@ WantedBy=multi-user.target
   stored in plain text in `auction.db`. Consider HTTPS (nginx or Cloud Run) if
   you deploy over the public internet.
 - **"Only admin can see":** Setup, Players, Results and Export are admin-only.
-  Captains only see the live auction board and their own wishlist.
+  Captains see the live auction board, their own wishlist, and their own **My
+  Team** roster. The `/view` screen is deliberately public — it is meant for a
+  projector/TV so spectators can watch without signing in.
+- **Unsold tracking:** every "mark unsold" or timer-expiry-no-bid increments a
+  player's `unsold_count`. The count is a permanent audit trail — it survives
+  rebidding and even the player being sold later.
 - **Timer expiry edge cases** (`admin` close mode, or `timer` mode when a
   captain disconnects): the admin always has **Sell / Mark Unsold / Cancel**
   buttons to close any round manually.
